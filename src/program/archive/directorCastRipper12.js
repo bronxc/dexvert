@@ -23,6 +23,8 @@ export class directorCastRipper12 extends Program
 		CallUntil("DismissWarnings", ${xu.MINUTE*45})`,	// some samples like pok18pc.dir and have a TON of dialogs to dismiss
 		timeout : xu.MINUTE*45
 	};
+	// TODO: This program is file extension SENSITIVE and will only load it as a cast file if the extension is .cst
+	// So we should probably detect the magic on our own and if it's a cast file, pre-rename it to .cst before passing it into this program (see sample/archive/macromediaDirector/julie)
 	postExec = async r =>
 	{
 		const outDirPath = r.outDir({absolute : true});

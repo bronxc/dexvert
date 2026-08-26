@@ -3,6 +3,7 @@ import {Format} from "../../Format.js";
 export class pmarcSFX extends Format
 {
 	name       = "PMarc SFX Archive";
+	website    = "http://fileformats.archiveteam.org/wiki/PMsfx";
 	ext        = [".com"];
 	magic      = ["PMarc CP/M SFX archive", "PMarc SFX archive", "PMsfx CP/M self-extracting archive", "16bit COM LHice SFX archive executable", "deark: lharc_sfx_com (LHarc self-extracting archive", "deark: pmsfx"];
 	converters = ["lha", "deark[module:pmsfx]"];

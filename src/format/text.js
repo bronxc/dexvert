@@ -241,7 +241,7 @@ export default
 		luaScript                                : {name : "Lua script", ext : [".lua"], magic : ["Lua script text executable", "Shell Skript: '/usr/bin/lua", "text/x-lua"]},
 		m4                                       : {name : "M4 Source File", website : "http://fileformats.archiveteam.org/wiki/M4", filename : [/\.m4\./], weakFilename : true, ext : [".m4"], magic : ["m4 preprocessor / macro source", "M4 macro processor script", /^sendmail m4 text file/], weakMagic : true},
 		mfcClassWizardInfo                       : {name : "MFC ClassWizard info", ext : [".clw"], magic : ["MFC ClassWizard info"]},
-		microsoftDeveloperStudioWorkspace        : {name : "Microsoft Developer Studio Workspace", ext : [".dsw"], magic : ["Microsoft Developer Studio Workspace", "Format: Microsoft Developer Studio Workspace"]},
+		microsoftDeveloperStudioWorkspace        : {name : "Microsoft Developer Studio Workspace", ext : [".dsw"], magic : ["Microsoft Developer Studio Workspace", "Format: Microsoft Developer Studio Workspace", "text/x-ms-visualstudio.workspace"]},
 		microsoftEmbeddedVisualToolsProject      : {name : "Microsoft eMbedded Visual Tools Project", ext : [".vcp"], magic : ["Microsoft eMbedded Visual Tools Project"]},
 		microsoftEmbeddedVisualToolsWorkspace    : {name : "Microsoft eMbedded Visual Tools Workspace", ext : [".vcw"], magic : ["Microsoft eMbedded Visual Tools Workspace"]},
 		microsoftHelpCompilerProject             : {name : "Microsoft Help compiler Project", ext : [".hpj"], magic : ["Microsoft Help compiler Project"], weakMagic : true},

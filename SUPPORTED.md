@@ -1,4 +1,4 @@
-# Supported File Formats (3,843)
+# Supported File Formats (3,842)
 Converters are in priority order. That is, early converter entries handle the format better than later converters.
 
 Extensions are in order of importance, with the format's primary extension appearing first.
@@ -491,7 +491,7 @@ archive | PKTINY Packed | .exe .com | [unp](https://sites.google.com/view/f1gpwc
 archive | [PKZip Archive](http://fileformats.archiveteam.org/wiki/ZIP) | .zip .exe | [sevenZip](http://p7zip.sourceforge.net/) [unzip](http://infozip.sourceforge.net/) [deark](https://entropymine.com/deark/) [unar](https://github.com/incbee/Unarchiver) [sqc](https://www.speedproject.com/download/old/) [izArc](https://www.izarc.org/) | [51 sample files](https://sembiance.com/fileFormatSamples/archive/zip/)
 archive | PlayStation 3 Theme | .p3t | [p3t_extract](https://github.com/hoshsadiq/ps3theme-p3t-extract) | [1 sample file](https://sembiance.com/fileFormatSamples/archive/playstation3Theme/)
 archive | [PMA Archive](http://fileformats.archiveteam.org/wiki/PMA) | .pma | [unar](https://github.com/incbee/Unarchiver) [lha](https://github.com/jca02266/lha) | [10 sample files](https://sembiance.com/fileFormatSamples/archive/pma/)
-archive | PMarc SFX Archive | .com | [lha](https://github.com/jca02266/lha) [deark](https://entropymine.com/deark/) | [11 sample files](https://sembiance.com/fileFormatSamples/archive/pmarcSFX/)
+archive | [PMarc SFX Archive](http://fileformats.archiveteam.org/wiki/PMsfx) | .com | [lha](https://github.com/jca02266/lha) [deark](https://entropymine.com/deark/) | [11 sample files](https://sembiance.com/fileFormatSamples/archive/pmarcSFX/)
 archive | PMWLite Packed | .exe .com | cup386 | [10 sample files](https://sembiance.com/fileFormatSamples/archive/pmwLitePacked/)
 archive | Postal game Archive | .sak | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) [dragonUnpacker](https://github.com/elbereth/DragonUnPACKer) | [12 sample files](https://sembiance.com/fileFormatSamples/archive/postalGameArchive/)
 archive | [PowerPacker Archive](http://fileformats.archiveteam.org/wiki/PowerPacker) | .pp | [unar](https://github.com/incbee/Unarchiver) [ancient](https://github.com/temisu/ancient_format_decompressor) [amigadepacker](https://gitlab.com/heikkiorsila/amigadepacker) | [20 sample files](https://sembiance.com/fileFormatSamples/archive/powerPack/) - Some files (Image & Aonia) won't extract (tried unar, ancient, ppunpack). I could install PowerPacker on the amiga and decrunch there. I looked at v4.0 and it was a nightmare to install, so I punted.
@@ -1225,7 +1225,7 @@ font | ZX Spectrum Font | .ch4 .ch6 .ch8 | [recoil2png](http://recoil.sourceforg
 
 
 
-## Image (800)
+## Image (799)
 Family | Name | Extensions | Converters | Notes
 ------ | ---- | ---------- | ---------- | -----
 image | [101 Clips Image](https://archive.org/details/tucows_370916_101_Clips_Pro) | .img | [callFunction](https://github.com/Sembiance/dexvert) | [18 sample files](https://sembiance.com/fileFormatSamples/image/oneOhOneClipsImage/)
@@ -1364,7 +1364,7 @@ image | COL Format 256 Color palette | .res .col | [wuimg](https://codeberg.org/
 image | [ColoRIX](http://fileformats.archiveteam.org/wiki/ColoRIX) | .rix .sca .scb .scc .sce .scf .scg .sci .sck .scl .scn .sco .scp .scq .scr .sct .scu .scv .scw .scx .scy .scz | [nconvert](https://www.xnview.com/en/nconvert/) [deark](https://entropymine.com/deark/) [pv](https://github.com/Sembiance/dexvert/tree/master/dos/PV.EXE) | [13 sample files](https://sembiance.com/fileFormatSamples/image/rix/)
 image | ColorSTar/MonoSTar | .bil .obj | [recoil2png](http://recoil.sourceforge.net) | [11 sample files](https://sembiance.com/fileFormatSamples/image/colorSTar/)
 image | [ColorViewSquash](http://fileformats.archiveteam.org/wiki/ColorViewSquash) | .rgb | [recoil2png](http://recoil.sourceforge.net) | [2 sample files](https://sembiance.com/fileFormatSamples/image/colorViewSquash/)
-image | Command Simulations game graphic |  | [deark](https://entropymine.com/deark/) [wuimg](https://codeberg.org/kaleido/wuimg) | [10 sample files](https://sembiance.com/fileFormatSamples/image/commandSimulationsGameGraphic/)
+image | [Command Simulations game graphic](http://fileformats.archiveteam.org/wiki/Command_Simulations_ILBM) |  | [deark](https://entropymine.com/deark/) [wuimg](https://codeberg.org/kaleido/wuimg) | [10 sample files](https://sembiance.com/fileFormatSamples/image/commandSimulationsGameGraphic/)
 image | Commodore 64 VIC | .vic | [recoil2png](http://recoil.sourceforge.net) [view64](http://view64.sourceforge.net/) | [21 sample files](https://sembiance.com/fileFormatSamples/image/vic/)
 image | [CompuServe RLE](http://fileformats.archiveteam.org/wiki/CompuServe_RLE) | .rle | [wuimg](https://codeberg.org/kaleido/wuimg) [recoil2png](http://recoil.sourceforge.net) [deark](https://entropymine.com/deark/) [cistopbm](http://netpbm.sourceforge.net/) | [59 sample files](https://sembiance.com/fileFormatSamples/image/compuServeRLE/) - RRCP1.RLE isn't able to be converted by recoil2png and cistopbm handles it better, but still a bit corrupted.
 image | [Computer Aided Acquisition and Logistics Support](http://fileformats.archiveteam.org/wiki/CALS_raster) | .ct1 .cal .ras .ct2 .ct3 .nif .ct4 .c4 | [convert](https://www.imagemagick.org/) [nconvert](https://www.xnview.com/en/nconvert/) [canvas5](https://winworldpc.com/product/deneba-canvas/5x) | [11 sample files](https://sembiance.com/fileFormatSamples/image/cals/)
@@ -1927,7 +1927,6 @@ image | The House of the Dead textures | .vmc .vram | [wuimg](https://codeberg.o
 image | [TheDraw .COM File](http://fileformats.archiveteam.org/wiki/TheDraw_COM_File) | .com | [deark](https://entropymine.com/deark/) | [10 sample files](https://sembiance.com/fileFormatSamples/image/theDrawCOM/)
 image | [TheDraw File](http://fileformats.archiveteam.org/wiki/TheDraw_Save_File) | .td | [abydosconvert](http://snisurset.net/code/abydos/) | [12 sample files](https://sembiance.com/fileFormatSamples/image/theDraw/)
 image | [Tilez texture](http://fileformats.archiveteam.org/wiki/Tilez_texture) | .til | [nconvert](https://www.xnview.com/en/nconvert/) | [11 sample files](https://sembiance.com/fileFormatSamples/image/tilezTexture/)
-image | [Timex 2048 Hi-Color](http://fileformats.archiveteam.org/wiki/SCR_(ZX_Spectrum)) | .scr | [recoil2png](http://recoil.sourceforge.net) | [7 sample files](https://sembiance.com/fileFormatSamples/image/timexHiColor/)
 image | [Timex 2048 Hi-Res](http://fileformats.archiveteam.org/wiki/SCR_(ZX_Spectrum)) | .scr | [recoil2png](http://recoil.sourceforge.net) | [9 sample files](https://sembiance.com/fileFormatSamples/image/timexHiRes/)
 image | [Timex 2048 Hi-Res Gigascreen](http://fileformats.archiveteam.org/wiki/SCR_(ZX_Spectrum)) | .hrg | [recoil2png](http://recoil.sourceforge.net) | [2 sample files](https://sembiance.com/fileFormatSamples/image/timexHiResGigascreen/)
 image | [Tiny Stuff](http://fileformats.archiveteam.org/wiki/Tiny_Stuff) | .tn1 .tn2 .tn3 .tn4 .tny | [wuimg](https://codeberg.org/kaleido/wuimg) [recoil2png](http://recoil.sourceforge.net) [deark](https://entropymine.com/deark/) [nconvert](https://www.xnview.com/en/nconvert/) [abydosconvert](http://snisurset.net/code/abydos/) | [38 sample files](https://sembiance.com/fileFormatSamples/image/tinyStuff/)
@@ -2605,7 +2604,7 @@ text | Adobe Illustrator Action | .aia |  | [10 sample files](https://sembiance.
 text | Adobe InDesign printing instructions report |  |  | [11 sample files](https://sembiance.com/fileFormatSamples/text/adobeInDesignPrintingInstructionsReport/)
 text | Adobe Photoshop Lightroom template | .agtemplate |  | [12 sample files](https://sembiance.com/fileFormatSamples/text/adobePhotoshopLightroomTemplate/)
 text | Adobe Portable Document Catalog Index | .pdx |  | [12 sample files](https://sembiance.com/fileFormatSamples/text/adobePortableDocumentCatalogIndex/)
-text | Adobe PostScript Character Map | .ps |  | [7 sample files](https://sembiance.com/fileFormatSamples/text/adobePostScriptCharacterMap/)
+text | Adobe PostScript Character Map | .ps |  | [10 sample files](https://sembiance.com/fileFormatSamples/text/adobePostScriptCharacterMap/)
 text | Advanced Gravis Phoenix configuration | .phx |  | [10 sample files](https://sembiance.com/fileFormatSamples/text/advancedGravisPhoenixConfiguration/)
 text | Advanced Stream Redirector | .asx |  | [13 sample files](https://sembiance.com/fileFormatSamples/text/advancedStreamRedirector/)
 text | Adventure Game Toolkit Messages | .msg |  | [11 sample files](https://sembiance.com/fileFormatSamples/text/adventureGameToolkitMessages/)
@@ -2838,7 +2837,7 @@ text | Doom 3 MD5 Animation | .md5anim |  | [10 sample files](https://sembiance.
 text | Doom Configuration | .cfg |  | [10 sample files](https://sembiance.com/fileFormatSamples/text/doomConfiguration/)
 text | DoomEd ASCII map | .dwd |  | [7 sample files](https://sembiance.com/fileFormatSamples/text/doomEdASCIIMap/)
 text | DoReMIX song | .dmx |  | [3 sample files](https://sembiance.com/fileFormatSamples/text/doReMIXSong/)
-text | [DOS Batch File](http://fileformats.archiveteam.org/wiki/Batch_file) | .bat |  | [11 sample files](https://sembiance.com/fileFormatSamples/text/batDOS/)
+text | [DOS Batch File](http://fileformats.archiveteam.org/wiki/Batch_file) | .bat |  | [12 sample files](https://sembiance.com/fileFormatSamples/text/batDOS/)
 text | DOSBox Configuration | .conf |  | [17 sample files](https://sembiance.com/fileFormatSamples/text/dosBoxConfig/)
 text | DosCapture video card Modes info | .mod |  | [10 sample files](https://sembiance.com/fileFormatSamples/text/dosCaptureVideoCardModesInfo/)
 text | Doxygen configuration settings | .cfg |  | [14 sample files](https://sembiance.com/fileFormatSamples/text/doxygenConfigurationSettings/)
