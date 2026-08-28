@@ -1,11 +1,11 @@
-# Supported File Formats (3,843)
+# Supported File Formats (3,844)
 Converters are in priority order. That is, early converter entries handle the format better than later converters.
 
 Extensions are in order of importance, with the format's primary extension appearing first.
 
 
 
-## Archive (694)
+## Archive (695)
 Family | Name | Extensions | Converters | Notes
 ------ | ---- | ---------- | ---------- | -----
 archive | 0000 Package Archive | .0000 | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [1 sample file](https://sembiance.com/fileFormatSamples/archive/package0000Archive/)
@@ -187,7 +187,7 @@ archive | Digital Romance System Archive | .dat .snr | [GARbro](https://github.c
 archive | [Disk Doubler](http://justsolve.archiveteam.org/wiki/DiskDoubler) | .dd .sea | [unar](https://github.com/incbee/Unarchiver) [macunpack](https://github.com/wnayes/macutils) | [15 sample files](https://sembiance.com/fileFormatSamples/archive/diskDoubler/)
 archive | [Disk Express](http://fileformats.archiveteam.org/wiki/Disk_Express) | .dxp | [deark](https://entropymine.com/deark/) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/diskExpress/)
 archive | [Disk Express SFX](http://fileformats.archiveteam.org/wiki/Disk_Express) | .exe | [deark](https://entropymine.com/deark/) [diskExpressSFX](https://github.com/Sembiance/dexvert/) | [9 sample files](https://sembiance.com/fileFormatSamples/archive/diskExpressSFX/)
-archive | [Disk Image](http://fileformats.archiveteam.org/wiki/Raw_disk_image) | .img .dsk .flp | [sevenZip](http://p7zip.sourceforge.net/) [aaru](https://github.com/aaru-dps/Aaru) | [15 sample files](https://sembiance.com/fileFormatSamples/archive/diskImage/)
+archive | [Disk Image](http://fileformats.archiveteam.org/wiki/Raw_disk_image) | .img .dsk .flp | [sevenZip](http://p7zip.sourceforge.net/) [aaru](https://github.com/aaru-dps/Aaru) | [17 sample files](https://sembiance.com/fileFormatSamples/archive/diskImage/)
 archive | [DiskDupe Disk Image](http://fileformats.archiveteam.org/wiki/DDI) | .ddi | [sevenZip](http://p7zip.sourceforge.net/) | [11 sample files](https://sembiance.com/fileFormatSamples/archive/diskDupeDiskImage/)
 archive | [DIV GamesStudio Graphics Library](http://fileformats.archiveteam.org/wiki/DIV_Games_Studio) | .fpg | [deark](https://entropymine.com/deark/) [nconvert](https://www.xnview.com/en/nconvert/) | [12 sample files](https://sembiance.com/fileFormatSamples/archive/divGamesStudioGraphicsLibrary/)
 archive | Divinity 2 Game Archive | .dv2 | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [3 sample files](https://sembiance.com/fileFormatSamples/archive/divinity2Archive/)
@@ -288,6 +288,7 @@ archive | Hooligans game data archive | .x13 | [gameextractor](https://sourcefor
 archive | Horde VDX Archive | .vdx | [na_game_tool_extract](https://nihav.org/game_tool.html) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/hordeVDXArchive/)
 archive | Hostile Waters MNG Archive | .mng | [na_game_tool_extract](https://nihav.org/game_tool.html) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/hostileWatersMNGArchive/)
 archive | Hot House EGG Archive | .egg | [na_game_tool_extract](https://nihav.org/game_tool.html) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/hotHouseEgg/)
+archive | HP COPYDISK | .img .dsk | [vibeExtract](https://github.com/Sembiance/dexvert) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/hpCOPYDISK/)
 archive | [HPACK Archive](http://fileformats.archiveteam.org/wiki/HPACK_(compressed_archive)) | .hpk | [hpack](https://www.sac.sk/download/pack/hpack79d.zip) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/hpack/)
 archive | HTTP Response |  |  | [11 sample files](https://sembiance.com/fileFormatSamples/archive/httpResponse/)
 archive | [Hyper Archive](http://fileformats.archiveteam.org/wiki/Hyper_archive) | .hyp | [hyper](http://cd.textfiles.com/phoenix2/01d/hyper25.zip) | [11 sample files](https://sembiance.com/fileFormatSamples/archive/hyperArchive/)
@@ -1392,7 +1393,7 @@ image | [DataShow Graphic](http://fileformats.archiveteam.org/wiki/DataShow_GRA)
 image | DataShow Screen | .scr | [abydosconvert](http://snisurset.net/code/abydos/) | [11 sample files](https://sembiance.com/fileFormatSamples/image/dataShowScreen/)
 image | [DataShow Sprite](http://fileformats.archiveteam.org/wiki/DataShow_Sprite) | .spr | [abydosconvert](http://snisurset.net/code/abydos/) | [4 sample files](https://sembiance.com/fileFormatSamples/image/dataShowSprite/)
 image | [DaVinci](http://fileformats.archiveteam.org/wiki/DaVinci) | .img | [recoil2png](http://recoil.sourceforge.net) | [1 sample file](https://sembiance.com/fileFormatSamples/image/daVinci/)
-image | DDS MIP Chain Image | .dds | [vibe2png](https://github.com/Sembiance/dexvert) | [9 sample files](https://sembiance.com/fileFormatSamples/image/ddsMIPChain/)
+image | DDS MIP Chain Image | .dds | [vibe2png](https://github.com/Sembiance/dexvert) | [14 sample files](https://sembiance.com/fileFormatSamples/image/ddsMIPChain/)
 image | [Degas Elite Brush](http://fileformats.archiveteam.org/wiki/DEGAS_Elite_brush) | .bru | [recoil2png](http://recoil.sourceforge.net) [wuimg](https://codeberg.org/kaleido/wuimg) | [11 sample files](https://sembiance.com/fileFormatSamples/image/degasEliteBrush/)
 image | [DEGAS Elite Icon](http://fileformats.archiveteam.org/wiki/DEGAS_Elite_icon) | .icn | [recoil2png](http://recoil.sourceforge.net) [wuimg](https://codeberg.org/kaleido/wuimg) | [13 sample files](https://sembiance.com/fileFormatSamples/image/degasEliteIcon/)
 image | [Degas High Resolution Picture](http://fileformats.archiveteam.org/wiki/DEGAS_image) | .pc3 | [wuimg](https://codeberg.org/kaleido/wuimg) [recoil2png](http://recoil.sourceforge.net) [abydosconvert](http://snisurset.net/code/abydos/) [nconvert](https://www.xnview.com/en/nconvert/) | [18 sample files](https://sembiance.com/fileFormatSamples/image/degasHi/)

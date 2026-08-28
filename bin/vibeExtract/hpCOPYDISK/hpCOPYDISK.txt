@@ -1,0 +1,159 @@
+HP COPYDISK disk-image format, version 2.x
+============================================================
+
+1. Purpose and scope
+--------------------
+
+HP COPYDISK is a sector-image container used by Hewlett-Packard's DOS
+COPYDISK utility.  A file contains one fixed 32-byte container header followed
+immediately by an uncompressed, headerless sector dump.  It does not contain a
+file table, per-sector records, compression, encryption, checksums, or a
+trailer.
+
+This specification describes the complete version 2.x on-disk layout.  All
+integers are unsigned 16-bit little-endian values.  Offsets and sizes below are
+in bytes and are measured from the beginning of the COPYDISK file.
+
+
+2. Complete file layout
+-----------------------
+
+  Offset  Size  Type       Name                 Required value / meaning
+  ------  ----  ---------  -------------------  -----------------------------
+  0x0000     9  byte[9]    signature            43 4F 50 59 44 49 53 4B 00
+                                                (ASCII "COPYDISK" plus NUL)
+  0x0009     2  uint16le   version_major        2 for this layout
+  0x000B     2  uint16le   version_minor        Producer's minor version
+  0x000D     2  uint16le   bytes_per_sector     Size of every payload sector
+  0x000F     2  uint16le   sector_count         Number of payload sectors
+  0x0011    15  byte[15]   reserved             All zero in a canonical file
+  0x0020     *  byte[]     sector_data          Raw sector payload
+
+The header structure can be expressed as the following packed declaration.
+Packing is important because the first 16-bit field begins at the odd offset
+0x0009.
+
+  struct CopyDiskHeaderV2 {
+      uint8_t  signature[9];
+      uint16_t version_major;
+      uint16_t version_minor;
+      uint16_t bytes_per_sector;
+      uint16_t sector_count;
+      uint8_t  reserved[15];
+  };
+
+The structure is exactly 32 (0x20) bytes.  There is no alignment padding.
+
+
+3. Header fields
+----------------
+
+signature
+  The identifier is exactly the eight uppercase ASCII bytes "COPYDISK"
+  followed by one 00 byte.  The terminating byte is part of the header and is
+  not optional.
+
+version_major and version_minor
+  These two words store the producing COPYDISK format/program version.  A
+  version displayed as 2.01 is stored as major 2 and minor 1; a 2.02 producer
+  stores major 2 and minor 2.  Minor-version changes do not alter the layout
+  described here.  A consumer implementing this specification must require
+  major version 2.  It may accept any minor value because the original reader
+  did not use that word when decoding the image.
+
+bytes_per_sector
+  The byte length of one raw sector.  It must be nonzero.  COPYDISK records the
+  value supplied by the source disk; 512 is typical for DOS floppy disks, but
+  the container layout itself represents any nonzero value through 65535.
+
+sector_count
+  The number of sectors in the payload.  It must be nonzero.  This is a sector
+  count, not a byte count.  For example, 2880 sectors of 512 bytes describe a
+  1,474,560-byte payload.
+
+reserved
+  Fifteen bytes reserved for expansion.  A canonical version 2.x writer fills
+  all of them with 00.  They have no effect on the payload.  A strict parser
+  should reject nonzero values because no defined extension assigns meaning to
+  them.
+
+
+4. Sector payload
+-----------------
+
+sector_data begins at absolute file offset 0x20.  It consists of exactly
+sector_count adjacent sectors, each exactly bytes_per_sector bytes long:
+
+  sector 0, sector 1, ... sector (sector_count - 1)
+
+Sector 0 is the first sector visible through the source disk device (normally
+the DOS boot sector).  The ordering is ascending absolute logical sector order.
+There are no gaps, sector headers, CHS tuples, error maps, or padding between
+sectors.  Every payload byte is copied verbatim into the corresponding raw
+image byte.
+
+The COPYDISK header does not store heads, tracks, sectors per track, filesystem
+type, partition information, or filenames.  If present, such information is
+inside the raw disk data itself, commonly in a boot-sector BIOS Parameter
+Block.  It is not part of the COPYDISK container format and must not be changed
+during conversion.
+
+
+5. Length and byte-accounting rules
+-----------------------------------
+
+The only valid total file length is:
+
+  expected_file_size = 32 + (bytes_per_sector * sector_count)
+
+Consequently, every byte has exactly one role:
+
+  bytes 0 through 31       container header
+  bytes 32 through EOF     sector_count complete raw sectors
+
+A shorter file is truncated.  A longer file has undefined trailing data; the
+format defines no trailer, so a strict converter must reject it.  There is no
+stored checksum to validate either the header or payload.
+
+
+6. Strict recognition and conversion
+-------------------------------------
+
+A fail-fast version 2.x converter should perform these operations before
+publishing output:
+
+  1. Read all 32 header bytes.
+  2. Require the exact nine-byte signature.
+  3. Decode the four little-endian words at offsets 0x09 through 0x10.
+  4. Require version_major == 2.
+  5. Require every reserved byte to be zero.
+  6. Require nonzero bytes_per_sector and sector_count values.
+  7. Require the physical file length to equal the formula in section 5.
+  8. Copy exactly the bytes beginning at offset 0x20 to the raw output without
+     transformation.
+
+The resulting standard raw image has length:
+
+  raw_image_size = bytes_per_sector * sector_count
+
+No COPYDISK header byte belongs in the raw output.  Conversely, no payload byte
+may be discarded or synthesized.
+
+
+7. hpCOPYDISK.py behavior
+-------------------------
+
+Usage:
+
+  python3 hpCOPYDISK.py [--all] inputFile outputFile
+
+On success, outputFile is the exact sector_data payload.  The program validates
+the complete input before atomically replacing outputFile.  It exits nonzero
+and does not create or replace outputFile for a bad signature, unsupported
+major version, nonzero reserved data, zero geometry value, truncation, trailing
+data, or an I/O failure.
+
+By default the raw image is the only generated file.  With --all, the converter
+also writes outputFile.json containing derived header values, complete byte
+accounting, and SHA-256 hashes.  The JSON sidecar is converter metadata and is
+not part of the COPYDISK format.

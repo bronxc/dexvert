@@ -69,10 +69,7 @@ export class sevenZip extends Program
 		// MENU could parsed out into a txt file representing the menu, but I'd have to find the binary format spec for these resources, for now, just ditch em
 		const SKIP_DIRS = ["ACCELERATOR", "DIALOG", "GROUP_CURSOR", "GROUP_ICON", "MENU", "VERSION"];
 		const SKIP_FILENAMES = ["ENGINE", "CODE", "DATA"];
-		if(SKIP_DIRS.some(v => dexFileRel.split("/").slice(0, -1).some(dirname => dirname.startsWith(v))) || SKIP_FILENAMES.includes(dexFileRel) || (!dexFileRel.includes("/") && dexFileRel.startsWith(".")))
-			return false;
-
-		return true;
+		return !SKIP_DIRS.some(v => dexFileRel.split("/").slice(0, -1).some(dirname => dirname.startsWith(v))) || SKIP_FILENAMES.includes(dexFileRel) || (!dexFileRel.includes("/") && dexFileRel.startsWith("."));
 	};
 	renameOut = r => (r.flags.singleFile ? {} : false);
 

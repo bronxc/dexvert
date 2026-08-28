@@ -12,7 +12,6 @@ import {path} from "std";
 // You can also specify a size and it will look for the 'match' bytes anywhere in the first 'size' bytes of the file
 // WARNING: YOU CANNOT DO: match : ["abc", "xyz"]  only 1 character at a time
 
-/* eslint-disable unicorn/no-hex-escape */
 const DEXMAGIC_CHECKS = {
 	// multi-format
 	"Trilobyte GDJ/VDX " : [{offset : 0, match : [0x67, 0x92]}],	// both an archive and a video
@@ -38,6 +37,7 @@ const DEXMAGIC_CHECKS = {
 	"HTTP Response"                      : [{offset : 0, match : "HTTP/1."}, {offset : 8, match : " 200 OK\r\n"}],
 	"Horde VDX Archive"                  : [{offset : 2, match : "RATVID"}],
 	"Hostile Waters MNG Archive"         : [{offset : 0, match : "ZGWH"}],
+	"HP COPYDISK"                        : [{offset : 0, match : "COPYDISK"}],
 	"Inno Setup Setup Data"              : [{offset : 0, match : "Inno Setup Setup Data"}],
 	"Inno Setup Data iPrefix #.#.#"      : [{offset : 0, match : "i"}, {offset : 1, match : [["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]]}, {offset : 2, match : "."}, {offset : 3, match : [["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]]}, {offset : 4, match : "."}, {offset : 5, match : [["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]]}],
 	"Inno Setup Data iPrefix ###"        : [{offset : 0, match : "i"}, {offset : 1, match : [["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]]}, {offset : 2, match : [["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]]}, {offset : 3, match : [["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]]}],
@@ -344,7 +344,6 @@ const DEXMAGIC_CHECKS = {
 	"VCD Entries File"                 : [{offset : 0, match : "ENTRYVCD"}],
 	"VideoTracker Routine"             : [{offset : 0, match : "PVC!"}]
 };
-/* eslint-enable unicorn/no-hex-escape */
 
 const DEXMAGIC_CUSTOMS = [
 	async function adMVI(r)
@@ -632,8 +631,7 @@ const DEXMAGIC_CUSTOMS = [
 					uo += us;
 				}
 			}
-
-			if(tp==="trak")
+			else if(tp==="trak")
 			{
 				for(let to=off+8;to+8<=off+sz;)
 				{
