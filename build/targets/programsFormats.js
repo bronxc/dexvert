@@ -100,6 +100,7 @@ export default async function programsFormats(xlog)
 		async function gimp() { return (await runUtil.run("python3", [path.join(import.meta.dirname, "programsFormats", "gimpListFormats.py")])).stdout.match(/(Format\s+[\s\S]+)/)[1]; },
 		async function iio2png() { return (await runUtil.run("iio2png", ["--formats"])).stdout.match(/Supported formats:([\s\S]+)/)[1].split("\n").map(v => v.trim()).join("\n"); },
 		async function iconvert__openimageio() { return (await runUtil.run("oiiotool", ["--list-formats"])).stdout.match(/All OIIO supported formats and their extensions:([\s\S]+)/)[1].split("\n").map(v => v.trim()).join("\n"); },
+		async function imconv__imtools() { return (await runUtil.run("imformats", [])).stdout; },
 		async function kss2wav__libkss()
 		{
 			const formatsData = (await runUtil.run("bzcat", [path.join((await fileUtil.tree("/usr/share/doc", {depth : 1, nofile : true, regex : /^libkss-/}))[0], "README.md.bz2")])).stdout;

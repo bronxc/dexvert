@@ -1,0 +1,1522 @@
+PC/GEOS GeoWrite document format (WDAT protocols 1.0 and 3.0)
+================================================================
+
+Scope and conventions
+---------------------
+
+This document describes both on-disk, single-byte-character-set GeoWrite
+document generations whose GEOS token is WDAT and creator is WP00:
+
+  * PC/GEOS 1.x, old GEOS file header, WDAT protocol 1.0;
+  * PC/GEOS 2.x, current GEOS file header, WDAT protocol 3.0.
+
+They are saved versions of the same GeoWrite document model.  Protocol 1 uses
+a page/object tree, small text chunks, and linked VM GStrings.  Protocol 3
+uses sections/articles and HugeArrays.  Both share the LMem, object, text,
+GString, and bitmap formats described below.  DBCS variants are out of scope.
+
+All integers are little-endian.  A word is 16 bits and a dword is 32 bits.
+Offsets in a structure are decimal unless prefixed with 0x.  VM handles and
+LMem chunk handles are even 16-bit values; zero is null.  GEOS assembly
+"record" bitfields are allocated from the most-significant bit toward the
+least-significant bit unless their declaration says otherwise.
+
+The protocol-3 file is layered as follows:
+
+  GeosFileHeader (256 bytes)
+  VMFileHeader2 continuation (24 bytes)
+  VM storage extents (used blocks, transaction blocks, and assigned free areas)
+    GeoWrite MapBlock
+    article object blocks
+    HugeArray directories and data blocks
+    text/style element blocks
+    master-page and GrObj blocks
+    DB groups/items and GString chains when used
+  VMHeader directory (itself one of the VM storage extents)
+
+Every file position stored in the VM layer is relative to the end of the
+256-byte GeosFileHeader.  Thus:
+
+  absolute_file_position = 256 + stored_VM_position
+
+The 24 bytes from 0x100 through 0x117 are part of the VM file header.  VM
+storage therefore begins at absolute position 0x118.  The union of used VM
+blocks, transaction blocks, and assigned-free extents covers the storage area;
+the VM directory can appear anywhere in that area.
+
+The protocol-1 envelope instead consists of a 200-byte GeosFileHeaderOld and
+an eight-byte VMFileHeaderOld.  All VM positions in that generation are
+absolute file positions.  Its first storage byte is 0xD0.  The used/free VM
+extents likewise cover the remainder of the file without gaps.
+
+
+1. PC/GEOS file headers
+-----------------------
+
+Protocol-3 PC/GEOS 2.x header (256 bytes)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Offset  Size  Field
+0x000   4     Signature: C7 45 C1 53 ("GEAS" with high bits on G and A)
+0x004   36    Long-name buffer, GEOS characters, NUL terminated when shorter
+0x028   2     GeosFileType; 2 means GFT_VM
+0x02a   2     GeosFileHeaderFlags
+0x02c   2     release major
+0x02e   2     release minor
+0x030   2     release change
+0x032   2     release engineering
+0x034   2     protocol major; 3 for this format
+0x036   2     protocol minor; 0 for this format
+0x038   4     application token characters: "WDAT"
+0x03c   2     token manufacturer ID: 0 (GeoWorks)
+0x03e   4     creator token characters: "WP00"
+0x042   2     creator manufacturer ID: 0 (GeoWorks)
+0x044   100   user notes buffer
+0x0a8   32    copyright/notice buffer
+0x0c8   2     creation date
+0x0ca   2     creation time
+0x0cc   8     password buffer
+0x0d4   16    desktop-private data
+0x0e4   28    reserved for later GEOS versions
+
+The date uses bits 15..9 for years since 1980, bits 8..5 for month, and bits
+4..0 for day.  The time uses bits 15..11 for hour, bits 10..5 for minute, and
+bits 4..0 for seconds divided by two.
+
+GeosFileHeaderFlags masks are 0x8000 template, 0x4000 shared-multiple,
+0x2000 shared-single, 0x0800 hidden, 0x0400 DBCS, 0x0200 unread, and 0x0100
+document-notes-present.  The remaining bits are reserved.  This specification
+requires the DBCS bit to be clear.
+
+Protocol-1 PC/GEOS 1.x header (200 bytes)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Offset  Size  Field
+0x000   4     Signature: C7 45 CF 53 (old "GEOS" signature)
+0x004   2     GeosFileTypeOld; 1 means GFTO_VM
+0x006   2     GeosFileHeaderFlags, as above
+0x008   8     release major, minor, change, engineering words
+0x010   4     protocol major/minor words; 1 and 0
+0x014   6     application GeodeToken: "WDAT", manufacturer 0
+0x01a   6     creator GeodeToken: "WP00", manufacturer 0
+0x020   36    long-name buffer
+0x044   100   user-notes buffer
+0x0a8   32    reserved old-header bytes
+
+The old header does not store the creation timestamp, password, desktop data,
+or copyright fields present in the 256-byte header.  Its old VM file-type enum
+is intentionally different: value 1, not the PC/GEOS 2.x GFT_VM value 2.
+
+
+2. VM file-header continuation
+------------------------------
+
+Protocol 3 uses this 24-byte VMFileHeader at 0x100:
+
+Offset  Size  Field
+0x100   2     VM signature, 0xADEB
+0x102   2     size in bytes of the VMHeader directory block
+0x104   4     VMHeader position relative to offset 0x100
+0x108   2     update counter
+0x10a   2     update operation
+0x10c   12    six reserved words
+
+Update operations 0 through 6 are READ, INTERNAL, SAVE, SAVE_AS, REVERT,
+UPDATE, and WRITE.  Values from 0x8000 upward are application-defined.
+
+Protocol 1 uses this eight-byte VMFileHeaderOld at 0x0C8:
+
+Offset  Size  Field
+0x0c8   2     VM signature, 0xADEB
+0x0ca   2     VMHeaderOld physical size
+0x0cc   4     absolute file position of VMHeaderOld
+
+There is no saved update counter/type or reserved continuation in protocol 1.
+
+
+3. VMHeader directory and VM block records
+-------------------------------------------
+
+For protocol 3 the directory begins at 256 + VMFH_headerPos; for protocol 1 it
+begins at absolute VMFHO_headerPos.  The size field is its physical block
+length.  VMH_lastHandle is the non-exclusive end of its record table and can
+be smaller than the physical block length; bytes from VMH_lastHandle to the
+physical end are zero alignment slack.
+
+Offset  Size  Field
+0       2     directory signature, 0x00FB
+2       2     first assigned-free handle
+4       2     last assigned-free handle
+6       2     first unassigned handle
+8       2     VMH_lastHandle
+10      2     assigned-free handle count
+12      2     unassigned handle count
+14      2     active used-block count, including the directory
+16      2     resident/dirty count saved by the VM manager
+18      2     extra-unassigned count
+20      2     GeoWrite map-block VM handle
+22      2     compaction threshold percentage
+24      4     total active used size
+28      1     VMAttributes
+29      1     VMCompressFlags
+30      2     protocol 3: DB map-block handle; protocol 1: map-extra chunk
+32      ...   12-byte VMBlockHandle records
+
+A VM handle is the byte offset of its record from the start of VMHeader.  The
+first record/handle is therefore 0x20 and later handles increase by 0x0C.
+
+Used and transaction record overlay (12 bytes):
+
+  +0  word   memory handle; only meaningful while resident
+  +2  byte   VMBlockType
+  +3  byte   VMBlockFlags
+  +4  word   user ID (VMID)
+  +6  word   physical file size
+  +8  dword  position relative to 0x100 in protocol 3, absolute in protocol 1
+
+VMBlockType is odd, so its low bit distinguishes this overlay from a free
+record.  Values are 0xFF USED, 0xFD DUP, 0xFB BACKUP, and 0xF9 ZOMBIE.  USED
+and DUP are the active blocks addressable by the document.  During a backup
+transaction, DUP is the new active block and has VMBF_HAS_BACKUP; a BACKUP
+record holds the old extent and its user-ID word contains the corresponding
+DUP handle.  A ZOMBIE is a freed active block retained so a transaction can
+still revert.  BACKUP and ZOMBIE records occupy file extents but are not part
+of VMH_numUsed.
+
+Protocol-3 VMBlockFlags masks are 0x10 COMPRESSED, 0x08 UNGROUPED_AVAIL, 0x04
+PRESERVE_HANDLE, 0x02 HAS_BACKUP, and 0x01 LMEM.  A compressed extent begins
+with a word containing the uncompressed size; the remaining bytes are an LZG
+stream accepted by the GEOS LZGUncompress routine.  Compression applies before
+LMem or client interpretation.
+
+Protocol 1 permits only the low three flag bits: 0x04 PRESERVE_HANDLE (used by
+conversion tools), 0x02 HAS_BACKUP, and 0x01 LMEM.  It has no compressed-block
+flag.  Used/free record positions are absolute rather than relative to 0x100.
+
+Free record overlay (12 bytes):
+
+  +0  word   next free-record handle
+  +2  word   previous free-record handle
+  +4  dword  physical free extent size; zero means unassigned handle
+  +8  dword  free position relative to 0x100 in protocol 3, absolute in 1
+
+Assigned records form a position-ordered doubly linked list.  Unassigned
+records form the available-handle list.  The directory's own record has handle
+0x20, VMID 0xADEB, and points back to the VMHeader bytes.
+
+Common system VMIDs are 0xFF00 DB map, 0xFF01 DB group, 0xFF02 DB item,
+0xFF03 HugeArray directory, 0xFF04 HugeArray data, and 0xFF05 document notes.
+Application blocks normally use VMID zero.
+
+
+4. LMem and ObjLMem blocks
+--------------------------
+
+An LMem heap starts with this 16-byte header:
+
+Offset  Size  Field
+0       2     memory handle (runtime value)
+2       2     byte offset of the local-handle table
+4       2     LocalMemoryFlags
+6       2     LMemType
+8       2     logical block size
+10      2     number of local handles
+12      2     first free chunk
+14      2     total bytes in free chunks
+
+LMemType values are 0 GENERAL, 1 WINDOW, 2 OBJ_BLOCK, 3 GSTATE, 4 FONT_BLK,
+5 GSTRING, and 6 DB_ITEMS.  LocalMemoryFlags are, high to low: HAS_FLAGS
+0x8000, IN_RESOURCE 0x4000, DETACHABLE 0x2000, DUPLICATED 0x1000,
+RELOCATED 0x0800, AUTO_FREE 0x0400, IN_LMEM_ALLOC 0x0200, IS_VM 0x0100,
+NO_HANDLES 0x0080, NO_ENLARGE 0x0040, RETURN_ERRORS 0x0020, two reserved bits,
+and a three-bit death count.
+
+The handle table contains one word per handle.  Its own offsets are the chunk
+handles.  A table value is the byte pointer to the chunk payload; 0 and 0xFFFF
+mean unallocated.  The word immediately before an allocated payload is the
+allocation size including that size word, so the payload length is size-2.
+Allocations and free chunks are word/paragraph aligned; alignment bytes are
+part of their allocation.  A free chunk uses its leading words for its size
+and next-free pointer.
+
+An ObjLMem block extends the header through offset 26:
+
+  16  word   in-use count
+  18  word   interactible count
+  20  dword  output optr
+  24  word   resource size
+
+An optr is stored as a low-word chunk handle followed by a high-word memory or
+VM block handle.  If LMF_HAS_FLAGS is set, the first fixed local chunk is a
+parallel byte array of ObjChunkFlags.  OCF_IS_OBJECT is 0x01,
+OCF_IN_RESOURCE 0x02, OCF_IGNORE_DIRTY 0x04, OCF_DIRTY 0x08, and
+OCF_VARDATA_RELOC 0x10.
+
+
+5. ChunkArray, ElementArray, and NameArray
+------------------------------------------
+
+ChunkArrayHeader (8 bytes):
+
+  +0  word   element count
+  +2  word   fixed element size; zero means variable-sized
+  +4  word   current/cache element index
+  +6  word   offset from header start to element data
+
+For fixed-sized arrays, count consecutive elements begin at CAH_offset.  For
+variable arrays, count words at CAH_offset are monotonically increasing byte
+offsets from the header start to each element.  The next offset bounds an
+element; the owning LMem chunk bounds the last one.
+
+ElementArrayHeader is ChunkArrayHeader followed by a word free-list token.
+RefElementHeader is a three-byte WordAndAHalf reference count (low word then
+high byte).  A high byte of 0xFF marks a free element and the low word links
+the free list.  StyleSheetElementHeader adds a two-byte style token after the
+RefElementHeader.
+
+TextElementArrayHeader is 12 bytes: ElementArrayHeader, a byte TextArrayType,
+and one unused byte.  TextArrayType values used by GeoWrite are 0 character
+attributes, 1 paragraph attributes, 2 graphics, and 3 type/hyperlink data.
+
+NameArrayHeader is ElementArrayHeader followed by a word fixed-data size.
+Every live variable element consists of RefElementHeader, that many fixed-data
+bytes, then a name of element_length-3-data_size bytes.  The name has no
+required terminator.  A free element contains only its free-list metadata and
+allocator padding.
+
+
+6. HugeArray
+------------
+
+A HugeArray directory is an LMem block with VMID 0xFF03:
+
+Offset  Size  Field
+0       16    LMemBlockHeader
+16      2     first data-block VM handle
+18      2     local handle of directory ChunkArray
+20      2     extended-directory link; zero in this format
+22      2     self VM handle
+24      2     element size; zero means variable
+26      ...   client extra header up to LMBH_offset
+
+The directory chunk is a fixed-size ChunkArray of 8-byte entries:
+
+  +0  dword  global index of last element in the data block
+  +4  word   size-accounting value used by split/merge decisions
+  +6  word   data-block VM handle
+
+Entry zero is the required sentinel {0xFFFFFFFF,0,0}.  HADE_size is accounting
+state updated by insert/delete operations, not necessarily the allocated VM
+extent length because LMem alignment and free-space changes are separate.
+
+Each data block has VMID 0xFF04 and this header:
+
+  0   16 bytes  LMemBlockHeader
+  16  word      next data-block VM handle
+  18  word      previous data-block VM handle
+  20  word      owner HugeArray-directory handle
+  22  2 bytes   alignment
+
+Local handle 0x18 identifies the data ChunkArray.  Its fixed element size must
+match the directory.  Directory last-index values, the doubly linked data
+chain, element counts, and owner handles describe the same ordering.
+
+
+7. GeoWrite MapBlock
+--------------------
+
+VMH_mapBlock points to a GENERAL LMem block.  Its fixed header is 100 bytes:
+
+Offset  Size  Field
+0       16    LMemBlockHeader
+16      2     character-attribute ElementArray VM block
+18      2     paragraph-attribute ElementArray VM block
+20      2     embedded-graphic ElementArray VM block
+22      2     type/hyperlink ElementArray VM block
+24      2     text-name NameArray VM block
+26      2     text-style NameArray VM block
+28      2     GrObj line-attribute ElementArray VM block
+30      2     GrObj area-attribute ElementArray VM block
+32      2     GrObj graphic-style NameArray VM block
+34      2     GrObj body/attribute-manager object block
+36      2     starting section number
+38      2     total document pages
+40      2     page width in PostScript points
+42      2     page height in PostScript points
+44      2     PageLayout
+46      2     VisLargeTextDisplayMode
+48      2     draft FontID
+50      2     draft point size
+52      16    invalid rectangle: signed dword left,top,right,bottom
+68      4     revision FileDateAndTime: date word, time word
+72      28    reserved
+
+PageLayout's low three bits are page type: 0 paper, 2 envelope, 4 label, 6
+postcard.  Paper, envelope, and postcard use bit 3 as the landscape flag.
+Labels use bits 14..9 for rows and bits 8..3 for columns.  Display-mode values
+are 0 PAGE, 1 CONDENSED, 2 GALLEY, 3 DRAFT_WITH_STYLES, and 4
+DRAFT_WITHOUT_STYLES.
+
+The MapBlock handle table begins at offset 100 in protocol 3.0.  Its first two
+fixed local handles identify SectionArray and ArticleArray.  Later chunks are
+localized strings and other map-owned data.
+
+
+8. Sections and articles
+------------------------
+
+SectionArray is a NameArray whose fixed-data size is 57.  A live element is:
+
+Offset  Size  Field
+0       3     RefElementHeader
+3       2     SectionFlags (0x8000: page number follows prior section;
+                  0x4000: needs recalculation)
+5       2     starting page number
+7       2     number of master pages, at most four
+9       2     number of columns
+11      2     column rule width, points*8
+13      2     column spacing, points*8
+15      2     left margin, points*8
+17      2     top margin, points*8
+19      2     right margin, points*8
+21      2     bottom margin, points*8
+23      8     four master-page VM handles
+31      4     deleted character count
+35      4     deleted line count
+39      3     deleted vertical space, WBFixed
+42      2     page count in this section
+44      16    reserved
+60      ...   section name
+
+ArticleArray is a NameArray whose fixed-data size is 34:
+
+  +0   3 bytes  RefElementHeader
+  +3   word     article ObjLMem VM block
+  +5   32 bytes reserved
+  +37  ...      article name
+
+
+9. Article object block and VisLargeText references
+---------------------------------------------------
+
+An article block is an ObjLMem block.  Its fixed handle-table slots are the
+object-flags chunk, the VisLargeText object chunk, the ArticleRegionArray, and
+one reserved slot.  The slots are obtained from LMBH_offset rather than by
+assuming literal handle numbers.
+
+In the protocol-3 saved VisLargeText object chunk, these references are at odd
+offsets because inherited instance data contains byte fields:
+
+  +23  word  text HugeArray
+  +25  word  character-run HugeArray
+  +27  word  paragraph-run HugeArray
+  +29  word  runtime VM-file handle (zero on disk)
+  +31  word  LineInfo HugeArray
+
+Saved variable-data entries begin at offset 124.  Every entry starts with a
+data-type word.  Low flag 0x0002 means an entry-size word follows; that size
+includes the four-byte header and is even.  Low flag 0x0001 is SAVE_TO_STATE.
+The type is obtained with value & 0xFFFC.  Relevant data types are 0x4800
+ATTR_VIS_TEXT_TYPE_RUNS, 0x4804 ATTR_VIS_TEXT_GRAPHIC_RUNS, 0x4808
+ATTR_VIS_TEXT_STYLE_ARRAY, and 0x480C ATTR_VIS_TEXT_NAME_ARRAY.  Each of these
+has a two-byte referenced handle when present.  Other VisText/VisLargeText
+vardata types retain selection, display, and UI state.
+
+
+10. Text, character encoding, and run arrays
+---------------------------------------------
+
+Article text is a HugeArray with element size one.  Its final byte is NUL and
+that terminator is not included in ArticleRegionArray character totals.
+Printable bytes use the PC/GEOS SBCS character set: bytes 0x20..0x7E are ASCII
+and 0x80..0xFF use the Macintosh Roman mapping.  Byte 0xF0 is the GEOS logo at
+the Macintosh Apple-logo code position.  This definition includes the full
+accented Latin, punctuation, currency, ligature, mathematical, and symbol
+mapping of MacRoman rather than a DOS code page.
+
+Significant control bytes are:
+
+  00 NUL terminator                 19 null-width character
+  09 tab                            1A embedded graphic
+  0B section break                  1B thin space
+  0C page/column break              1C en space
+  0D paragraph return               1D em space
+                                     1E nonbreaking hyphen
+                                     1F optional hyphen
+
+Text run arrays are HugeArrays of five-byte elements.  Their client extra
+header is one word naming the associated ElementArray VM block.  An element is
+a 24-bit text position followed by a word element token.  Character,
+paragraph, and type runs begin at position zero.  The required final element
+has position 0xFFFFFF and token 0xFFFF.  Graphic runs are sparse: they contain
+an entry only at each 0x1A character position, followed by that sentinel.
+
+
+11. Character attributes
+------------------------
+
+The character array has TextArrayType 0 and fixed 38-byte elements:
+
+Offset  Size  Field
+0       3     RefElementHeader
+3       2     style token
+5       2     FontID
+7       3     point size, WBFixed
+10      1     TextStyle
+11      4     foreground ColorQuad
+15      2     signed track kerning
+17      1     font weight
+18      1     font width
+19      2     VisTextExtendedStyles
+21      1     foreground SystemDrawMask
+22      2     foreground GraphicPattern
+24      4     background ColorQuad
+28      1     background SystemDrawMask
+29      2     background GraphicPattern
+31      7     reserved
+
+WBFixed stores the fractional byte first and unsigned integer word second.
+TextStyle masks are 0x01 underline, 0x02 strike-through, 0x04 subscript, 0x08
+superscript, 0x10 italic, 0x20 bold, and 0x40 outline.  Extended-style masks are
+0x8000 boxed, 0x4000 button, 0x2000 index, 0x1000 all-caps, 0x0800 small-caps,
+0x0400 hidden, 0x0200 change-bar, 0x0100 background-color, and 0x0080 nowrap.
+The default superscript and subscript size is exactly 50 percent of the saved
+point size.  Their default baseline displacement is also 50 percent of the
+unscaled point size: upward for superscript and downward for subscript.
+
+When background-color is set, fill the horizontal extent of each contiguous
+character-style range from the saved top of its LineInfo through that line's
+full saved height, before painting the glyphs.  The horizontal endpoint is the
+range's laid-out glyph, track-kerning, and justification advance; it is not a
+font bounding box.  Use the background ColorQuad, draw mask, and pattern.
+GraphicPattern type 0 is solid and its second byte is ignored.  Type 1 is a
+system hatch: numbers 0..5 are vertical, horizontal, 45-degree, 135-degree,
+brick, and slanted brick.  Hatch families are page/device aligned, not reset
+at each style range.  Their repeat delta is four points normal to the line and
+the video driver paints a square-capped one-device-pixel line.  Brick combines
+a solid horizontal line with a vertical 4-on/4-off line whose (4,4) repeat
+also advances the dash phase by four points; slanted brick likewise combines
+solid 45-degree and dashed 135-degree lines.
+
+FontID bits 15..12 are the manufacturer, bits 11..9 are the family (serif,
+sans-serif, script, ornament, symbol, monospace, special, nonportable), and the
+remaining bits select the face within that maker/family.  Correct rendering of
+nonportable IDs requires the font catalog from the originating system.
+For the Nimbus-Q maker, representative portable face IDs are 0x1000 URW
+Roman, 0x1200 URW Sans, 0x1400 Zapf Chancery, 0x1403 Park Avenue, 0x1604
+Cooper Black, 0x1605 Blippo Black, 0x160B Old Town, 0x160F Arnold Boecklin,
+0x1800 URW Symbol, 0x1801 Dingbats, and 0x1A00 URW Mono.  A reader must not
+discard the face-selecting low bits merely because it can fall back by family.
+
+Font width is a percentage: the standard enumerants are 25 minimum, 75
+narrow, 85 condensed, 100 medium, 125 wide, 150 expanded, and 200 maximum.
+Font weight is likewise a percentage, normally 100.  Track kerning is a
+signed degree in the range -150..500.  Its document-space increment is the
+rounded integer point size multiplied by the degree and divided by 256.  That
+increment is added to every rendered character advance, including the final
+character in a style run; it is not a field-wide scaling factor.
+
+ColorQuad is red-or-index byte, ColorFlag byte, green byte, blue byte.
+ColorFlag 0 is indexed, 1 gray, 2 same/unchanged, 3 CMY, and 0x80 RGB.  Indexed
+0..15 are black, blue, green, cyan, red, violet, brown, light gray, dark gray,
+light blue, light green, light cyan, light red, light violet, yellow, white.
+Indices 0x10 onward enter the GEOS gray and color ramps.
+
+
+12. Paragraph attributes and tabs
+---------------------------------
+
+The paragraph array has TextArrayType 1 and variable elements.  Each live
+element is 72 + 8*numberOfTabs bytes:
+
+Offset  Size  Field
+0       3     RefElementHeader
+3       2     style token
+5       2     border flags
+7       4     border ColorQuad
+11      2     paragraph attributes
+13      2     left margin, points*8
+15      2     right margin from right edge, points*8
+17      2     first-line/paragraph margin, points*8
+19      2     line spacing, BBFixed (fraction byte, integer byte)
+21      2     leading, points*8
+23      2     space above, points*8
+25      2     space below, points*8
+27      4     background ColorQuad
+31      1     number of tabs
+32      1     border width, points*8
+33      1     border spacing, points*8
+34      1     border shadow, points*8
+35      1     border SystemDrawMask
+36      1     background SystemDrawMask
+37      2     border GraphicPattern
+39      2     background GraphicPattern
+41      2     default tab spacing, points*8
+43      2     starting paragraph number
+45      4     numbering prepend characters
+49      2     hyphenation bitfield
+51      1     keep-lines bitfield
+52      2     drop-cap bitfield
+54      2     next-style token
+56      1     StandardLanguage
+57      15    reserved
+72      ...   Tab records
+
+Paragraph-attribute bits 15..14 are justification (0 left, 1 right, 2 center,
+3 full); following masks are 0x2000 keep with next, 0x1000 keep together,
+0x0800 allow auto-hyphenation, 0x0400 disable wrapping, 0x0200 column break
+before, 0x0380 three-bit numbering type, 0x0040 drop cap, and 0x0020 keep
+lines.  Border masks from the high bit are left, top, right, bottom, double,
+inner-lines, and shadow; the low two bits are the shadow anchor.
+
+A Tab is position word (points*8), attribute byte, draw-mask byte, line-width
+byte, line-spacing byte, and anchor-character word.  Attribute bits 4..2 are
+leader (none, dot, line, bullet) and bits 1..0 are type (left, center, right,
+anchored).
+
+
+13. Saved line layout
+---------------------
+
+LineInfo is a variable-element HugeArray.  It is the authoritative cached
+layout and gives one record per line:
+
+Offset  Size  Field
+0       2     LineFlags
+2       3     line height, WBFixed
+5       3     baseline offset from line top, WBFixed
+8       2     signed justification adjustment
+10      3     character count, WordAndAHalf
+13      3     last-field full-justification space padding, WBFixed
+16      2     rounded end-of-line x position
+18      7     first FieldInfo
+25      ...   additional FieldInfo records
+
+FieldInfo is character-count word, x-position word, width word, and one-byte
+TabReference.  Field character counts sum exactly to LI_count.  Fields divide
+a line at margins and tab characters.  TabReference bit 7 selects ruler versus
+other reference and bits 6..0 give the tab number or a special 0x7D..0x7F
+reference.
+
+The line's drawing origin is region_left + LI_adjustment.  A field begins at
+that origin plus FI_position.  LI_adjustment therefore supplies paragraph and
+left margins as well as the displacement for centered and right-justified
+lines; it is not part of FI_position.  FI_width is the complete saved field
+advance and can include invisible control-character advances, such as the
+terminal return.  An embedded VisTextGraphic retains its saved width rather
+than being stretched to consume those invisible advances.
+
+FI_width is cached layout metadata, not a request to rescale the text at draw
+time.  Drawing starts each style run at the pen returned by the preceding run
+and uses the selected font's native advances, font-width percentage, track
+kerning, and pair kerning.  LI_spacePad is installed only while drawing the
+last field and is added to the advance of each ordinary space in that field.
+The final return/page/column/section-break character is included in the field
+count but suppressed when control-character display is disabled.  A generated
+or optional hyphen is drawn only after the last drawable piece of the final
+field.  These rules are important for coincident text objects: fitting visible
+glyphs to FI_width causes objects that differ only by a hidden terminator to
+drift apart progressively.
+
+LineFlags masks are 0x8000 starts paragraph, 0x4000 ends paragraph, 0x2000 ends
+in return, 0x1000 ends in column break, 0x0800 ends in section break, 0x0400
+ends in NUL, 0x0200 needs draw, 0x0100 needs calculation, 0x0080 generated
+hyphen, 0x0040 optional hyphen, 0x0020 interacts above, 0x0010 interacts below,
+0x0008 last character extends right, 0x0004 last character kerned, and 0x0002
+contains extended style.
+
+The sum of LineInfo character counts equals article bytes excluding the final
+NUL.  A final NUL line can consequently have count zero.
+
+
+14. Article regions and page placement
+--------------------------------------
+
+ArticleRegionArray is a fixed ChunkArray with 54-byte elements:
+
+Offset  Size  Field
+0       4     character count in region
+4       4     line count in region
+8       2     section index
+10      4     signed x document coordinate
+14      4     signed y document coordinate
+18      2     region width
+20      2     region height
+22      3     calculated occupied height, WBFixed
+25      4     DB group/item for explicit flow region; zero means rectangle
+29      2     flags: 0x8000 ended by column break, 0x4000 empty
+31      3     reserved
+34      4     inherited text-region DB group/item
+38      4     draw-region DB group/item
+42      4     flow object optr
+46      8     reserved
+
+Regions are in text-flow order.  Their character and line totals cover the
+article and LineInfo arrays.  In page display mode, page_index is integer
+division of y by page height and the local page y is the remainder.  Explicit
+DB regions use the GEOS scanline-region encoding: alternating y coordinates
+and inclusive x transition pairs, terminated by 0x8000 sentinels; they replace
+the rectangular bounds for clipping and obstruction flow.
+
+
+15. Master pages, embedded graphics, and shared subformats
+----------------------------------------------------------
+
+A master-page VM block is ObjLMem type 2.  In protocol 3.0 its application
+header follows the 26-byte ObjLMem header:
+
+  +26  dword  header flow-object optr
+  +30  dword  footer flow-object optr
+  +34  word   MasterPageFlags (0x8000 user modified)
+  +36  28     reserved through the fixed 64-byte header
+
+The remaining fixed chunks contain FlowRegionArray and master-page objects.
+A FlowRegionArray element is position XYOffset (4), size XYSize (4), text
+region DB item (4), draw region DB item (4), flow-object optr (4), rule-object
+optr (4), article word (2), and eight reserved bytes: 36 bytes total.
+
+An embedded text graphic is a 50-byte VisTextGraphic element:
+
+  +0   3     RefElementHeader
+  +3   4     VMChain: VM block, DB group/item, or local chunk
+  +7   4     width and height words
+  +11  1     type: 0 GString, 1 application-variable graphic
+  +12  2     flags (0x8000 draw from baseline, 0x4000 handles pointer,
+                   0x2000 hot spot)
+  +14  4     reserved
+  +18  32    type-specific data
+
+For GString type, the 32 bytes hold a GEOS TransMatrix followed by XYOffset.
+TransMatrix is 28 bytes in this order: four WWFixed values e11, e12, e21,
+e22, followed by two DWFixed values e31 and e32.  WWFixed is a signed 16.16
+number stored fraction word then signed integer word.  DWFixed is a signed
+32.16 number stored fraction word then signed integer dword.  The resulting
+row-vector matrix is:
+
+  [ e11 e12 0 ]
+  [ e21 e22 0 ]
+  [ e31 e32 1 ]
+
+XYOffset is signed x and y words.  Text first places the graphic so its saved
+height ends at the line baseline, applies TransMatrix, moves by XYOffset, and
+plays the GString at that current position.  The saved width is also the text
+advance.
+
+For a VM-chain GString, VMChain.low is zero and VMChain.high is a VMID 0xFF03
+variable-element HugeArray.  Every HugeArray element is one complete GString
+order.  Opcode 0x00 is the required one-byte final GR_END_GSTRING order.
+Graphics-state and transform orders affect later bitmap orders in the usual
+way; the bitmap-relevant orders are:
+
+  Opcode  Size  Order and operands after opcode
+  0x10    5     apply rotation; WWFixed degrees
+  0x11    9     apply scale; x and y WWFixed
+  0x12    9     apply translation; x and y WWFixed
+  0x13    29    apply TransMatrix
+  0x14    9     apply signed-dword x/y translation
+  0x15    29    set TransMatrix
+  0x16    1     set null transform
+  0x17    1     restore default transform
+  0x18    1     make current transform the default
+  0x19    1     save transform
+  0x1A    1     restore transform
+  0x4C    7+N   fill bitmap: signed x, signed y, N word, N bitmap bytes
+  0x4D    3+N   fill bitmap at current point: N word, N bitmap bytes
+  0x50    7+N   draw bitmap: signed x, signed y, N word, N bitmap bytes
+  0x51    3+N   draw bitmap at current point: N word, N bitmap bytes
+  0x54    3+N   continuation slice: N word, N CBitmap bytes
+  0x60    1     save graphics state
+  0x61    1     restore graphics state
+  0x62    2     set MixMode byte (0 clear, 1 copy, 2 no-op, 3 AND,
+                 4 invert, 5 XOR, 6 set, 7 OR)
+  0x75    4     set area color; red, green, blue bytes
+  0x76    2     set area SystemDrawMask byte
+  0x78    7     set AreaAttr: ColorFlag, red/index, green, blue,
+                 SystemDrawMask, ColorMapMode
+  0x79    2     set indexed area color
+  0xA0    5     begin path: PathCombineType word, flags, reserved byte
+  0xA1    1     end path
+  0xA2    11    set clip rectangle: PathCombineType and four signed words
+  0xA3    11    set window clip rectangle, same operands
+  0xA5    4     set clip path: RegionFillRule byte, PathCombineType word
+  0xA6    4     set window clip path, same operands
+
+PathCombineType values are 0 null, 1 replace, 2 union, and 3 intersection.
+The remainder of the GString language supplies drawing primitives, text,
+paths, comments, and other state attributes.  Each order is self-contained in
+its HugeArray element, so element boundaries account for every order byte.
+
+Bitmap and CBitmap
+~~~~~~~~~~~~~~~~~~
+
+A simple Bitmap header is six bytes:
+
+  +0  word  width in pixels
+  +2  word  height in pixels
+  +4  byte  BMCompact: 0 uncompressed, 1 PackBits, 2 LZG,
+             0x80..0xFF application-defined
+  +5  byte  BMType
+
+BMType bit 7 is reserved, bit 6 says a Palette is present, bit 5 identifies a
+HugeBitmap, bit 4 says each scan line starts with a one-bit transparency mask,
+bit 3 selects the complex CBitmap header, and bits 2..0 are BMFormat:
+
+  0 monochrome, one bit/pixel
+  1 indexed 4-bit, one packed nibble/pixel
+  2 indexed 8-bit, one byte/pixel
+  3 RGB 24-bit, red/green/blue byte triples
+  4 CMYK, four one-bit planes
+  5 CMY, three one-bit planes
+
+Within a byte, the leftmost pixel is the most-significant bit; in 4-bit data,
+the left pixel is the high nibble.  If BMType bit 4 is set, the transparency
+mask precedes the color data on every scan line.  A set mask bit is opaque and
+a clear bit is transparent.  The uncompressed scan size is:
+
+  maskBytes = (width + 7) / 8 rounded down after the addition
+  monoBytes = maskBytes
+  fourBitBytes = (width + 1) / 2 rounded down
+  eightBitBytes = width
+  rgbBytes = width * 3
+  cmykBytes = maskBytes * 4
+  cmyBytes = maskBytes * 3
+  scanBytes = formatBytes + (mask-present ? maskBytes : 0)
+
+An uncompressed simple Bitmap consists of its six-byte header followed by
+height scan lines.  A complex CBitmap extends the header to 20 bytes:
+
+  +6   word  CB_startScan, first scan number in this slice
+  +8   word  CB_numScans, number of scans in this slice
+  +10  word  CB_devInfo, transient device/callback value
+  +12  word  CB_data, offset from the CBitmap start to scan data
+  +14  word  CB_palette, offset from the CBitmap start to Palette
+  +16  word  horizontal resolution in pixels/inch
+  +18  word  vertical resolution in pixels/inch
+
+CB_devInfo has no persistent pixel meaning and may retain the value used by
+the producer.  Resolution controls physical size: width*72/xResolution by
+height*72/yResolution points before the active transform.
+
+A Palette begins with a word entry count, followed by that many three-byte
+red/green/blue entries.  Without a supplied palette, indices 0..15 are the
+standard GEOS colors listed under character attributes; 0x10..0x1F are 16
+grays in steps of 0x11; 0x20..0x27 are reserved black entries; and 0x28..0xFF
+are a 6*6*6 RGB cube, ordered red, then green, then blue, with component steps
+of 0x33.
+
+In a GString, a complex bitmap may span multiple elements.  The first
+GR_DRAW_BITMAP/GR_FILL_BITMAP payload is a complete CBitmap slice; immediately
+following 0x54 elements each carry another complete CBitmap slice.  A
+zero-scan first slice is legal and carries only the common header and optional
+palette.  A palette-carrying slice sets BMType bit 6; continuation slices that
+reuse that palette may clear bit 6 and omit the Palette.  After excluding this
+per-slice palette-presence bit, all slices retain the same dimensions, BMType,
+compression, and resolution.  Their
+[CB_startScan, CB_startScan+CB_numScans) intervals must cover the declared
+height exactly without overlap.  Each order's N counts only its
+Bitmap/CBitmap bytes, not the opcode/coordinates/size word.
+
+PackBits compression restarts for each scan line and expands to exactly
+scanBytes.  Control bytes 0x00..0x7F copy the following control+1 literal
+bytes.  Controls 0x80..0xFF repeat the following byte 257-control times.  The
+next compressed byte begins the next scan after exactly scanBytes output
+bytes; a run may not cross that boundary.  This is the GEOS implementation,
+including its 129-byte interpretation of control 0x80 rather than the later
+QuickDraw no-op convention.
+
+GR_DRAW_BITMAP paints the decoded bitmap colors and observes the optional
+transparency mask.  GR_FILL_BITMAP requires monochrome data and treats its set
+pixels as a shape filled with the current area color, draw mask, and mix mode.
+GString transforms and clips in force at the bitmap order apply to its origin
+and physical pixel size.
+
+The MapBlock GrObj handle identifies the standard GeoWrite GrObj body and
+attribute managers.  Graphic objects are ObjLMem class instances linked by
+optrs; they consume the referenced line/area/style element arrays and can own
+GString or bitmap VMChains.  DB group/item references use the standard GEOS DB
+item allocator layered on VMID 0xFF00..0xFF02 blocks.  These are shared GEOS
+subformats rather than byte blobs private to GeoWrite: a complete visual
+renderer must interpret the GrObj class instances, DB scanline regions,
+GString opcodes, and Bitmap structures in addition to the document structures
+above.
+
+
+15a. Protocol-3 GrObjBody and page drawing objects
+--------------------------------------------------
+
+The MapBlock word at 34 is an ObjLMem block owned by the GeoWrite GrObj
+attribute manager.  Its WriteGrObjBodyClass object has class fptr
+6000:0002.  The saved GrObjBody instance begins at object offset 35:
+
+Offset  Size  Field
+35      16    RectDWord document bounds: left, top, right, bottom
+51      4     draw-list head optr
+55      4     draw-list tail optr
+59      2     draw-list child count
+
+The bottom coordinate normally spans all document pages.  The list order is
+the paint order.  FlowRegionClass objects (6000:0000) correspond one-for-one
+to ArticleRegionArray.object optrs; render the associated article region at
+that point in the list.  This interleaves text and graphics without guessing
+which is in front.  WrapFrameClass (6000:0007) is a drawable Rect subclass.
+HeaderFooterRegionClass (6000:0004) is the analogous master-page text region.
+
+Saved optrs consist of an lptr word and a saved block-relocation word.  A
+relocation of 0x4000 means the current VM block.  A value 0x7000+n denotes VM
+handle 32+12*n.  The low bit of a GrObj draw-link lptr is CCF_LAST; clear it
+to obtain the chunk.  A last child link returns to its owning group/body.
+All earlier links identify the next child.  The declared body count, link
+termination, and return-to-owner link must agree.
+
+Every standard GrObj object starts with a four-byte class fptr and a word
+whose value 6 locates GrObjInstance.  Relative to that offset, the persistent
+base is:
+
++0      4     forward draw link optr
++4      4     reverse draw link optr
++8      2     GrObjAttrFlags
++10     1     GrObjOptimizationFlags
++11     2     GrObjMessageOptimizationFlags
++13     2     GrObjLocks
++15     1     action modes
++16     1     temporary state
++17     2     normal ObjectTransform lptr
++19     2     sprite ObjectTransform lptr (normally null when saved)
++21     2     area-attribute token, or 0xFFFF for a group
++23     2     line-attribute token, or 0xFFFF for a group
+
+GrObjAttrFlags has the following persistent masks:
+
+  0x0003  wrap type
+  0x0004  multiplicative resize
+  0x0008  instruction object
+  0x0010  delete on insert/delete
+  0x0020  resize on insert/delete
+  0x0040  move on insert/delete
+  0x0080  paste-inside child
+  0x0100  group has paste-inside children
+  0x0200  do not copy locks
+
+The group summary bit 0x0100 must agree with the presence of at least one
+direct child carrying 0x0080.  Undefined higher bits are invalid.
+
+ObjectTransform is an exact 44-byte local chunk:
+
++0      6     center.x DWFixed
++6      6     center.y DWFixed
++12     4     signed width WWFixed
++16     4     signed height WWFixed
++20     4     parent width WWFixed
++24     4     parent height WWFixed
++28     4     e11 WWFixed
++32     4     e12 WWFixed
++36     4     e21 WWFixed
++40     4     e22 WWFixed
+
+The object-to-parent mapping is translate(center) followed by the 2-by-2
+matrix.  Signed dimensions preserve reflection.  Groups recursively apply
+their own mapping before child mappings.  GrObjGroupClass is 3003:000D; at
+base+25 it stores its child-list head optr, followed by a suspend word and an
+unsuspend byte.  It has no child-count field, so CCF_LAST is authoritative.
+Normal group children paint first in list order.  If paste-inside children are
+present, the normal children also supply one winding clip area; paint the
+paste-inside children in list order through that clip.  A nested group's clip
+area excludes its own paste-inside children.  Rectangular geometric objects
+contribute their object paths, a spline contributes its closed ward path, and
+a BitmapGuardian contributes its full OBJECT rectangle rather than only its
+nontransparent pixels.  These rules are part of GrObjGroup drawing; painting
+the paste child at its unclipped rectangular bounds is incorrect.
+
+The GrObj library class fptr is 0x3003 plus the following zero-based export
+ordinal:
+
+  7 Rect             8 RoundedRect       9 Ellipse
+ 10 Line            11 Arc              12 GString
+ 13 Group           15 GrObjBitmap      16 BitmapGuardian
+ 17 GrObjSpline     18 SplineGuardian   19 GrObjText
+ 20 TextGuardian    21 MultTextGuardian
+
+Rect and Ellipse use the centered rectangle
+[-width/2,-height/2,+width/2,+height/2].  Line joins (-width/2,0) to
+(+width/2,0).  RoundedRect adds a radius word at base+25.  Arc adds
+ArcCloseType byte, start/end WWFixed angles, three cached PointWWFixed values,
+and a WWFixed radius; the cached points are redundant drawing accelerators.
+
+GrObjGString adds at base+25 a HugeArray VM handle and two WWFixed center-
+translation values.  Round each translation as GEOS does, establish the
+object transform/attributes, translate by that pair, then execute the
+variable-element GString.  In HugeArray GStrings GR_COMMENT uses the array
+element extent as its length; the stream-form OpComment size word is omitted.
+Current-position bitmap orders have a three-byte opcode/size prefix and use
+the GState current point.  Positioned bitmap orders have opcode, x, y, and
+size.  Native path clips retain every primitive and its then-current
+transform; PathCombineType 3 intersects the prior clip with that path.
+
+The line-attribute block at MapBlock+28 and area-attribute block at +30 each
+contain one variable ElementArray.  A live GrObjBaseLineAttrElement is 26
+bytes: five-byte StyleSheetElementHeader; RGB at +5; LineEnd +8; LineJoin +9;
+width WWFixed +10; SystemDrawMask +14; LineStyle +15; miter WWFixed +16;
+element type +20 (zero); arrow-info byte +21; arrow angle/length +22/+23; and
+reserved-zero word +24.  A live GrObjBaseAreaAttrElement is 20 bytes: style
+header; RGB +5; mask +8; MixMode +9; GraphicPattern +10; background RGB +12;
+type +15; area-info +16 (bit 0 means transparent); reserved zero byte/word
++17/+18.  Type 1 extends it to 28 bytes with gradient type +20, ending RGB
++21, interval count +24, and a saved reserved word +26.  Gradient types are
+none, left-to-right, top-to-bottom, radial rectangle, and radial ellipse.
+Free ElementArray entries are three bytes and have 0xFF at entry byte 2.
+
+Vis guardians add at base+25 a ward optr, a four-byte ward-class fptr, and a
+guardian flags byte.  First apply the guardian's normal transform.  Let the
+ward Vis bounds be (l,t,r,b); then apply
+
+  scale(objectWidth/(r-l), objectHeight/(b-t))
+  translate(-(l+r)/2, -(t+b)/2)
+
+This is MSG_GOVG_APPLY_OBJECT_TO_VIS_TRANSFORM.  It is required for correct
+bitmap, spline, and small-text placement.  The ward then draws according to
+its own Vis-class convention.  In particular, VisSpline point coordinates
+are local to the ward: before drawing them, VisSpline applies an additional
+translation by (l,t), the left and top of its Vis bounds.  Bitmap and text
+ward drawing already expresses its content relative to those saved bounds.
+
+A GrObjBitmapClass ward has Vis master offset 8.  Its Vis bounds are four
+signed words at +8.  VisBitmapInstance begins at +25, and the main editable
+bitmap HugeArray VM handle is at +28.  The HugeArray extra header begins with
+the 20-byte CBitmap, followed by BitmapMode, ColorTransfer handle, and saved
+VideoDriverInfo/private device bytes.  CB_devInfo is either 0 or 24;
+CB_data is zero because scan lines are HugeArray elements.  A supplied
+palette may lie anywhere within the bounded extra header at CB_palette and is
+a count word plus count RGB triples.  Palette-bit images may omit it to use
+the system palette.  There must be exactly height scan-line elements.  For an
+uncompressed image the HugeArray element size equals scanBytes; compressed
+elements concatenate into the per-row PackBits stream described above.
+
+A GrObjSplineClass ward has master offsets 8 (Vis) and 56 (GrObjVis).  Its
+VisSplineInstance starts at +25: SplineState byte, edit-state byte, saved
+point-block relocation at +27, and point-array lptr at +29.  The point array
+is a fixed seven-byte ChunkArray.  Each SplinePointStruct is x/y signed
+WBFixed followed by PointInfo.  Bit 0x80 marks a control; 0x10 distinguishes
+a previous control from a next control.  Other points are anchors.  A control
+immediately before an anchor is its incoming Bezier control; one immediately
+after is its outgoing control; an absent control equals the anchor.  In
+SplineState, 0x40 closes the last anchor to the first and 0x20 enables area
+fill.  Empty point arrays are valid invisible wards.
+
+A GrObjTextClass ward has master offsets 8 (Vis) and 106 (GrObjVis).
+VisTextInstance starts at +25: local text, character-run, paragraph-run,
+VM-file, and LineInfo lptrs at +25,+27,+29,+31,+33, followed by storage flags.
+Text is NUL-terminated.  LineInfo is a variable ChunkArray in the same format
+as article lines.  The character/paragraph/type/graphic arrays are small
+TextRunArrayHeader ChunkArrays: fixed size 5, data offset 12, element VM block
+at header +8, transient element-array cache word +10, then WordAndAHalf/token
+runs terminated by FFFFFF/FFFF.  Variable-data begins at ward offset 114;
+ATTR_VIS_TEXT_TYPE_RUNS (0x4800) and ATTR_VIS_TEXT_GRAPHIC_RUNS (0x4804)
+contain their local run-array lptrs.  Render saved fields inside the ward Vis
+bounds, using the document-global text element arrays.
+
+
+16. Protocol-1 GeoWrite map and document setup
+----------------------------------------------
+
+The protocol-1 VM map block is an ObjLMem block with exactly 16 local handles,
+0x18 through 0x36.  Handle 0x18 is the parallel 16-byte ObjChunkFlags array;
+0x1A is PageArray, 0x1C is MasterPageArray, and 0x1E is the 64-byte
+WriteDocumentData.  Handles 0x20 through 0x36 are reserved and unallocated.
+
+WriteDocumentData is:
+
+Offset  Size  Field
+0       2     old packed PageSizeEntryData
+2       1     PaperOrientation: 0 portrait, 1 landscape
+3       1     number of columns, 1 through 4
+4       1     column spacing in points
+5       1     column-rule width in points
+6       2     paging type: 0 single master, 1 facing-page masters
+8       2     title-page Boolean
+10      8     margins Rectangle: left, top, right, bottom point words
+18      2     WriteDocumentAttrs: 0x8000 title-page state,
+                  0x4000 extended page size is valid
+20      2     character-style ElementArray VM handle
+22      2     ruler ElementArray VM handle
+24      2     text-graphic ElementArray VM handle
+26      2     name ElementArray VM handle
+28      2     obsolete/unused saved word
+30      1     flags: 0x80 overstrike mode; low seven bits reserved
+31      4     extended XYSize: width and height point words
+35      29    reserved zero bytes
+
+When 0x4000 is clear, the low and high bytes of the old page-size word are
+width/9 and height/9.  When it is set, the extended XYSize is authoritative.
+Landscape swaps the resulting width and height.  The margins are distances
+from their named paper edges, not right/bottom coordinates.
+
+
+17. Protocol-1 page and master-page arrays
+------------------------------------------
+
+Both old arrays use the four-byte GW12_ChunkArrayHeader: element-count word
+and fixed-element-size word, immediately followed by elements.
+
+A 30-byte PageArrayElement is:
+
+  +0   word  page ObjLMem VM handle
+  +2   XYSize (4 bytes) saved page display size, excluding borders
+  +6   word  PageAttributes; 0x8000 is the obsolete MAXIMIZED bit
+  +8   Point (4) saved view position
+  +12  XYSize (4) saved view size
+  +16  XYOffset (4) saved document offset of the view
+  +20  9 bytes obsolete view-state storage
+  +29  byte alignment pad
+
+The view position, view size, and document offset are UI restoration state;
+they do not affect printing.  The final ten bytes are zero in canonical saved
+documents.  The element's display size can be stale after a page-setup change;
+WriteDocumentData and MasterPageArray provide the current physical size.
+
+A MasterPageArrayElement is 87 bytes:
+
+  +0   XYSize (4) physical paper width and height
+  +4   Rectangle (8) union bounds of all active columns
+  +12  byte number of active columns
+  +13  byte column-rule width
+  +14  byte reserved, zero
+  +15  four 18-byte MasterColumn records
+
+Each MasterColumn is a reserved zero word, signed Point x/y, XYSize width/
+height, and eight reserved zero bytes.  Unused slots are all zero.  Active
+columns share y and height, increase monotonically in x, do not overlap, and
+their union equals the rectangle at +4.  MasterPageArray has one element for
+normal paging and two for facing-page paging.  Page N uses master
+N modulo masterCount.
+
+
+18. Protocol-1 saved object graph
+---------------------------------
+
+Every PageArray VM handle owns an ObjLMem block.  Local handle 0x22 is a
+104-byte page-content object.  Its object header contains class relocation
+0x6000 and master offsets 8, 8, and 94.  The Vis instance at +8 has page-local
+bounds.  The scale from those saved application coordinates to paper points
+is:
+
+  xScale = physicalPaperWidth / VisBounds.right
+  yScale = physicalPaperHeight / VisBounds.bottom
+
+All pages in one document use the same scale.  The VisComp first-child optr at
++25 uses same-block relocation 0x4000 and names the header text object.  The
+Write page-content subclass at +94 is the eight-byte master body rectangle
+and a word whose only defined saved bit is 0x0002.
+
+The Vis sibling links form this chain for each page:
+
+  page content -> header -> footer -> column 1 -> ... -> column N -> parent
+
+Header and footer are in the page block.  Columns are separate ObjLMem VM
+blocks.  An old saved optr is a chunk word plus a relocation-ID word.  0x4000
+means the current VM block.  A non-state-VM relocation is 0x7000|index and
+resolves to VM handle 0x20 + 12*index.  LP_IS_PARENT is bit 0 of the chunk
+word; clear it before using the chunk handle.
+
+The header/footer text subclass is two bytes containing relocation 0x4000.
+The column subclass is six bytes: owning-page relocation, previous-column
+relocation, and next-column relocation.  Previous/next form one document-wide
+chain across page boundaries; zero terminates either end.
+
+The standard 17-byte VisInstance within each object consists of Rectangle
+bounds; one-byte type, attribute, optimization, geometry, and specific-UI
+flags; then the four-byte sibling/parent LinkPart.  Saved window handles,
+selection positions, cursor/timer values, geometry invalidation flags, and
+other standard class-instance fields are runtime/UI cache state.  They are
+preserved structural bytes but do not change document content or PDF output.
+
+
+19. Protocol-1 text objects, runs, lines, and fields
+----------------------------------------------------
+
+The old text object begins with class relocation 0x6000.  The application
+master offset is 13 for 89-byte header/footer objects and 12 for 93-byte
+column objects; the Vis master offset is 8 and OldVisText ends at 0x57 (87).
+The OldVisTextInstance fields, at absolute object offsets, are:
+
+  +8   17    VisInstance
+  +25  2     text chunk handle
+  +27  2     character/style RunArray chunk
+  +29  2     ruler RunArray chunk
+  +31  2     type RunArray chunk
+  +33  2     graphic RunArray chunk
+  +35  1     external VisText state
+  +36  1     OldVisTextTypeFlags
+  +37  1     input filter
+  +38  4     output optr
+  +42  2     selection start
+  +44  2     selection end
+  +46  2     maximum length
+  +48  1     left/right text padding
+  +49  1     top/bottom text padding
+  +50  4     wash-color SetColorParams
+  +54  2     old line-record chunk
+  +56  2     old field-record chunk
+  +58  2     first free-field byte offset, 0xFFFF if none
+  +60  3     calculated text height, WBFixed
+  +63  2     press/selection start
+  +65  2     last mouse text address
+  +67  4     cursor Point
+  +71  2     one-line left offset
+  +73  2     transient GState handle
+  +75  1     GState reference-count/flags
+  +76  1     internal flags
+  +77  1     internal selection flags
+  +78  1     miscellaneous flags
+  +79  2     cached last width
+  +81  2     cached last height
+  +83  2     cursor timer handle
+  +85  2     cursor timer ID
+
+OldVisTextTypeFlags are, high bit first: multiple styles, multiple rulers,
+multiple types, default style, default ruler, size-warning issued, ignore
+paragraph background, and do-not-draw graphics.  Saved GeoWrite document text
+uses the first three bits and therefore references four RunArrays.
+
+The text chunk is the same SBCS character stream described in section 10 and
+has exactly one final NUL.  A RunArray has this ten-byte header:
+
+  +0 local ElementArray chunk; +2 relocation ID for its VM block;
+  +4 local NameArray chunk;    +6 relocation ID for its VM block;
+  +8 cached last-run word.
+
+Four-byte RunArrayElements follow: start-position word and element-token word.
+Positions strictly increase.  Character, ruler, and type arrays start at zero;
+graphic runs are sparse and correspond one-for-one to byte 0x1A.  The final
+run is {0x8000,0xFFFF}.
+
+The line chunk is a sequence of ten-byte cache records:
+
+  +0 word first FieldInfo byte offset; +2 word OldLineFlags/cache state;
+  +4 word height; +6 word baseline from top; +8 signed adjustment.
+
+The field chunk is a pool of 13-byte OldFieldInfo records:
+
+  +0  word next record byte offset, or 0xFFFF
+  +2  byte OldFieldFlags
+  +3  word absolute text start
+  +5  word x position on line
+  +7  word saved width
+  +9  WBFixed full-justification space padding
+  +12 byte OldTabReference
+
+OldFieldFlags, high bit first, mean starts-with-tab, ends-in-return,
+ends-in-auto-hyphen, last-character-kerned, was-last-character-kerned,
+ends-in-optional-hyphen, and two reserved bits.  OldTabReference bit 7 selects
+an "other" reference instead of the ruler; low seven bits are its number.
+Each line owns a nonempty linked field list.  The object also owns a free list.
+Together those disjoint lists account for every 13-byte record exactly once.
+Field starts infer character counts up to the next field/line/text end.
+
+
+20. Protocol-1 style, ruler, and graphic ElementArrays
+------------------------------------------------------
+
+Each global array is an ObjLMem block with only object-flags chunk 0x20 and
+data chunk 0x22 allocated.  The data begins with old ElementArray:
+
+  +0 word count; +2 word first-free token (or ruler token counter);
+  +4 word insertion token; +6 first element.
+
+Element begins with reference-count word and application-ID word.  Zero
+reference count marks a free element; fixed style/graphic arrays link every
+free element through the ID word.  Run tokens are byte offsets from the array
+start, not ordinal indexes.
+
+OVisTextStyle is 18 bytes: Element header (4), FontID word, WBFixed point size,
+TextStyle byte, four-byte old SetColorParams, signed track-kerning word, and
+two reserved zero bytes.  SetColorParams is either indexed (index byte,
+ColorMapModes byte, unused word) or RGB (red, modes, green, blue).  The modes
+byte holds RGB/index in bit 7, a two-bit 25/50/75/100 percent screen, wash
+transparency, on-black, and a two-bit ColorMapMode.
+
+OVisTextRuler is 36 + 4*tabCount bytes:
+
+  +0   4     Element header
+  +4   2     unique ruler token used by runs
+  +6   2     old paragraph-border flags
+  +8   4     border SetColorParams
+  +12  1     justification/default-tabs attributes
+  +13  6     left, right-from-edge, and paragraph margins
+  +19  2     BBFixed line spacing
+  +21  2     leading
+  +23  2     BBFixed space above
+  +25  2     BBFixed space below
+  +27  4     background SetColorParams
+  +31  1     tab count
+  +32  4     reserved zeros
+  +36  ...   four-byte OTab records
+
+OTab is position word, attribute byte, and anchor character.  Attribute bits
+7..6 encode line width, 5..4 line spacing, 3..2 leader (none/dot/line), and
+1..0 left/center/right/anchored type.
+
+OVisTextGraphic is 58 bytes:
+
+  +0   4     Element header
+  +4   4     saved width and height
+  +8   28    TransMatrix
+  +36  4     reserved zeros
+  +40  1     type: 0 null, 1 chunk GString, 2 VM GString, 3 method
+  +41  1     flags; 0x80 draws relative to baseline
+  +42  16    type-specific opaque data
+
+VM GString data is obsolete file-handle zero, first VM-block handle, optional
+block count (zero means terminated chain), and an eight-byte play rectangle.
+The saved files use a null-terminated chain.  Method graphic 0x4007 is the
+GeoWrite page-number variable and is formatted with the surrounding character
+attribute.  Chunk GStrings require runtime-local storage and are rejected by
+a standalone file converter.
+
+
+21. Protocol-1 VM GStrings
+--------------------------
+
+Every VM block in an old GString chain begins with next-block word and used-
+size word.  Orders occupy bytes 4 through usedSize-1.  The chain must be
+acyclic and the concatenated stream ends with opcode 0 exactly once.  Unlike
+protocol 3, orders are not individually wrapped in HugeArray elements.
+
+The complete old opcode/argument-size table is below.  Sizes exclude the
+one-byte opcode.  "N" values are little-endian words unless stated otherwise.
+
+  00  0 end                         01  2+N comment
+  02  0 null                        03  4+N escape: code,N,data
+  04  0 save state                  05  0 restore state
+  06  0 new page                    07  4 apply rotation
+  08  8 apply scale                 09  8 apply translation
+  10 24 set OldTransMatrix          11 24 apply OldTransMatrix
+  12  0 null transform              13  8 draw line
+  14  4 draw line-to                15  8 draw rectangle
+  16  4 draw rectangle-to           17  6 draw horizontal line
+  18  2 horizontal line-to          19  6 draw vertical line
+  20  2 vertical line-to            21/22 round-rectangle forms
+  23  4 draw point                  24  0 draw point at current point
+  25  var positioned bitmap         26 var bitmap at current point
+  27/28 memory bitmap pointers       29  5 draw character
+  30  1 character at current point  31  6+N positioned text
+  32  2+N text at current point      33 var draw text field
+  34 memory text pointer             35  2+4N polyline
+  36  8 ellipse                     37 arc
+  38  3+4N spline                   39  2+4N polygon
+  40  8 fill rectangle              41  4 fill rectangle-to
+  42/43 fill round-rectangle forms  44 fill arc
+  45  3+4N fill polygon             46  8 fill ellipse
+  47  1 MixMode                     48  4 relative move
+  49  4 move                         50  3 line RGB color
+  51  1 line mask                   52  1 line color-map mode
+  53  2 line width                  54  1 line join
+  55  1 line end                    56 10 complete line attributes
+  57  4 miter limit                 58  2 line style
+  59  3 area RGB color              60  1 area mask
+  61  1 area color-map mode         62  6 complete area attributes
+  63  3 text RGB color              64  1 text mask
+  65  1 text color-map mode         66  2 text style
+  67  2 text mode                   68  3 WBFixed text space padding
+  69 20 complete OldTextAttr        70  5 font and WBFixed size
+  71  0 set string bounds           72  2 create palette
+  73  2 destroy palette             74  2 set palette entry
+  75  2 set palette                 76  2 border width
+  77  1 border join                 78  1 indexed line color
+  79  8 custom line mask            80  1 indexed area color
+  81  8 custom area mask            82  1 indexed text color
+  83  8 custom text mask            84  3+2N custom line style
+  85  2 track kerning               86  0 initialize default transform
+  87  0 restore default transform   88 10 clip rectangle
+  89 10 document clip rectangle
+
+OldTransMatrix is six WWFixed values rather than four WWFixed plus two
+DWFixed translations.  Text-field opcode 33 has a byte-count word, a 28-byte
+OldGDF_saved record, the SBCS string, then one or more 22-byte OldTFStyleRun
+records.  Each run is character count plus a 20-byte OldTextAttr.  Run counts
+cover the string exactly.
+
+GState coordinate transforms apply to primitive geometry, bitmap placement,
+and text placement, but not to the logical line width.  The graphics kernel
+scales line width only through the output window/device transform; it does not
+multiply it by GR_APPLY_SCALE or another GState transform.  This distinction
+is essential for GrObj shapes: they commonly scale a unit rectangle to the
+object bounds and then stroke it with a one- or two-point page-space line.
+Line dash lengths, caps, and joins likewise remain line attributes rather than
+being multiplied by the unit-shape transform.  System draw masks are aligned
+in output-device space, not stretched with object geometry.
+
+The byte-count starts at OldGDF_saved and ends after the first style run.  It
+is therefore 28 + stringLength + 22.  Further style runs follow that counted
+extent, and the sum of their character counts determines where the next
+GString opcode begins.  OldGDF_saved is packed as follows:
+
+  +0   word  transient next-field value; 0xFFFF marks no next field
+  +2   byte  OldFieldFlags
+  +3   word  source-string field start
+  +5   word  horizontal field position
+  +7   word  saved field width
+  +9   3     WBFixed full-justification space padding
+  +12  byte  OldTabReference
+  +13  4     OTab: position, attributes, anchor
+  +17  word  left edge of the containing area
+  +19  word  horizontal field adjustment
+  +21  byte  Justification
+  +22  word  text-left offset
+  +24  word  drawing y position
+  +26  word  saved baseline bookkeeping value
+
+Playback starts the field at x = position + adjustment + textLeft and at the
+saved y position.  OldFieldFlags bits 0x80, 0x40, 0x20, 0x10, 0x08, and 0x04
+mean starts with tab, ends in carriage return, ends in generated hyphen, last
+character kerned, previously kerned, and ends in optional hyphen.
+
+OldTextAttr is:
+
+  +0   byte  ColorFlag: 0 indexed or 0x80 RGB
+  +1   3     red/index, green, blue
+  +4   byte  SystemDrawMask
+  +5   byte  ColorMapMode
+  +6   byte  TextStyle bits to set
+  +7   byte  TextStyle bits to clear
+  +8   byte  TextMode bits to set
+  +9   byte  TextMode bits to clear
+  +10  3     old WBFixed space padding
+  +13  word  FontID
+  +15  3     WBFixed point size
+  +18  word  signed track-kerning degree
+
+Styles and modes are updated as (old & ~clear) | set.  TextStyle bits from low
+to high are underline, strike-through, subscript, superscript, italic, bold,
+outline, and reserved.  Track kerning is pointSize*degree/256 points added to
+each drawn character advance.  GeoWorks' conversion playback deliberately replaces the old
+per-run space-padding member with zero; the separately saved field metrics
+already contain the old justification placement.
+
+Opcodes 21, 22, 37, 42, 43, and 44 were explicitly unsupported by GeoWorks'
+own 1.x-to-2.x conversion library; opcodes 27, 28, and 34 contain live memory
+pointers rather than portable file references.  A strict standalone reader
+must reject those orders.  The saved protocol-1 document profile covered here
+does not use them.
+
+For bitmap opcodes, positioned form first has signed x/y words.  Every Bitmap
+or CBitmap slice is preceded by a byte-count word.  Slices continue until
+their scan ranges cover the declared height.  An old CBitmap has the same
+20-byte header as section 15.  Its data/palette offsets are either {20,0} or
+{68,20}; the latter reserves 48 bytes for sixteen RGB triples.  GeoWorks'
+official converter deliberately ignored this old fixed palette and retained
+the pixel indices against the system palette.  That behavior is part of the
+old format's conversion semantics.
+
+Old clip orders 88 and 89 have 1.x flag semantics that the official converter
+discarded rather than translating.  They are still ten fully consumed bytes;
+they do not establish a protocol-3 clip.
+
+
+22. System drawing masks
+------------------------
+
+SystemDrawMask is a byte: low seven bits select a pattern, bit 7 inverts it.
+0x7F selects the eight custom bytes most recently supplied.  A pattern is an
+8-by-8 bitmap, one byte per row, most-significant bit at the left, aligned to
+window/device coordinate (0,0), not to an individual shape.
+
+Named values 0..9 are tile, shaded bar, horizontal, vertical, diagonal NE,
+diagonal NW, grid, big grid, brick, and slant brick.  Patterns 10..24 are
+reserved system patterns.  Pattern 25 is solid; patterns 26..88 are the GEOS
+64-level ordered dither sequence; pattern 89 is empty.  The patterns that
+occur as saved state in protocol-1 GeoWrite documents are:
+
+  0: 99 42 24 99 99 24 42 99       1: FB F5 FB F5 FB F5 FB F5
+  2: FF 00 FF 00 FF 00 FF 00      25: FF FF FF FF FF FF FF FF
+ 89: 00 00 00 00 00 00 00 00
+
+Fill-bitmap orders combine the monochrome silhouette, area color, active mask,
+MixMode, transform, and clip.  Device-aligned mask placement matters when a
+bitmap is scaled or translated.
+
+
+23. Validation invariants
+-------------------------
+
+A strict reader should reject before emitting output unless all of these hold:
+
+* either the GEAS/GFT_VM/protocol-3 or old GEOS/GFTO_VM/protocol-1 envelope
+  matches, and WDAT/WP00 manufacturer-zero tokens are exact;
+* every offset/size is within the file and VM extents neither overlap nor leave
+  unexplained bytes in the VM storage area;
+* VM counts match active/free records, the directory self-record matches, and
+  every BACKUP targets a DUP with HAS_BACKUP;
+* referenced VM handles are active and their VMIDs/LMem types are appropriate;
+* all LMem handles, allocation sizes, and ChunkArray offsets are bounded and
+  nonoverlapping;
+* HugeArray directory indexes and forward/back links agree with element counts;
+* GStrings end exactly at GR_END_GSTRING, bitmap order byte counts equal their
+  payloads, PackBits rows end at scan boundaries, and CBitmap slices cover the
+  height without gaps or overlap;
+* text arrays have one terminal NUL, run arrays are ordered and terminated,
+  and all run tokens resolve to live elements;
+* protocol-3 section/article/region/line totals and page coordinates agree;
+* protocol-3 GrObj body counts, saved relocations, forward/last links, group
+  return links, class/ward pairs, transforms, attribute tokens, spline points,
+  small-text runs, and editable bitmap scan-line counts agree;
+* protocol-1 map chunks, page/master counts, object links, relocation IDs,
+  text/run/field lists, element free lists, and column owner/previous/next
+  chains agree and account for every record;
+* unknown protocol structures, DBCS text, or unsupported compression are not
+  silently guessed.
+
+
+24. Converter implementation boundary
+---------------------------------------
+
+geoWorksGeoWriteDocument.py validates and consumes both envelopes and VM
+graphs.  For protocol 3 this includes the document map, sections, articles,
+HugeArrays, text/run/element arrays, LineInfo, and regions.  For protocol 1 it
+includes setup/master/page arrays, Vis object chains, header/footer/column
+text, all four RunArrays, fixed ElementArrays and their free lists, cached
+line/field pools, page-number variables, linked GStrings, and the old bitmap
+envelope.  Its PDF renderer uses the saved line and field origins rather than
+heuristically reflowing text.  In accordance with CommonFieldDraw, it does not
+stretch substituted text to FI_width; glyph advances, FontWidth, track
+kerning, last-field space padding, hidden terminators, tabs, and generated
+hyphens are handled independently.
+
+It paints embedded GString GR_DRAW_BITMAP and GR_FILL_BITMAP operations,
+including simple/complex headers, multi-element slices, uncompressed and
+PackBits rows, monochrome/4-bit/8-bit/RGB pixels, palettes, transparency masks,
+resolution, saved transformations, fill color, all 90 system drawing masks,
+inverse/custom masks, device alignment, and rectangular clip paths.  For
+protocol 1 it also paints OldDrawTextField strings and style runs plus line,
+line-to, horizontal/vertical line, polyline, point, rectangle, ellipse,
+polygon, filled rectangle, filled polygon, and filled ellipse orders.  Their
+saved transforms, graphics-state stack, RGB/index colors, line widths, joins,
+ends, miter limits, system line styles, draw masks, fill rules, and the
+clear/copy/no-op/invert/set MixModes used by the saved profile are honored.
+GState transforms are applied to vector paths before page-space pen attributes
+are applied, matching the kernel's separate geometry and line-width spaces.
+Every supported payload is decoded and validated before the destination PDF
+is committed.  Protocol-3 non-rectangular GString paths retain their primitive
+geometry and transforms and clip subsequent vector and bitmap output.
+
+Protocol-1 page header/footer text and page-number variables are painted.
+Protocol-3 GrObjBody output is painted in its saved z-order, interleaved with
+FlowRegion text.  Implemented objects are groups, rectangles, rounded
+rectangles, ellipses, lines, arcs, editable HugeArray bitmaps, GrObjText,
+GrObjSpline, and GrObjGString, including nested transforms and object
+attributes.  Current-point bitmap orders and native path clips are supported.
+Groups also implement GrObj paste-inside composition, including nested object
+transforms, normal-child clip-area construction, and bitmap paste children.
+Character background-color ranges, all six system hatch patterns, and the
+standard 50-percent superscript/subscript scaling and displacement are painted.
+
+Remaining implementation boundaries are protocol-3 master-page object trees
+beyond article-backed FlowRegions, DB-backed non-rectangular text-flow region
+clipping, uncommon GraphicPattern fills and GrObj arrowheads, several less
+common GString curve/arc/text orders, application-variable graphics other than
+legacy page numbers, original FontID catalogs, and extended text/paragraph
+paint effects (boxed/button/all-caps/small-caps/change bars, paragraph borders,
+drop caps, and numbering).  Bitmap LZG and
+CMY/CMYK painting are also not implemented.  LZG decompression is additionally
+needed to accept compressed protocol-3 VM blocks; uncompressed blocks use the
+same structures after expansion.  Inputs that require a rejected feature fail
+before the destination is committed.

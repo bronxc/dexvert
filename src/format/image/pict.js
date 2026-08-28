@@ -37,14 +37,9 @@ export class pict extends Format
 			"ffmpeg[format:qdraw_pipe][outType:png]"
 		);
 
-		const clarisClipArtConverters =
-		[
-			"soffice[matchType:magic][outType:png]" // soffice sometimes produces just text that says "QuickTime and a Ph..." which doesn't get detected
-		];
-
 		// If we have this magic, then the other converters are unlikely to produce an image, so put these first
 		if(dexState.hasMagics("Claris clip art"))
-			r.push(...clarisClipArtConverters);
+			r.push("soffice[matchType:magic][outType:png]");	 // soffice sometimes produces just text that says "QuickTime and a Ph..." which doesn't get detected
 
 		// even though we have forbidExtMatch above, keep the [matchType:magic] here because if dexvert is explictily called with asFormat image/pict we end up here (such as chaining from deark) and we want to avoid so many slow windows program executions
 		r.push(
@@ -66,15 +61,15 @@ export class pict extends Format
 			"corelDRAW[matchType:magic]"
 		);
 		
-		// Otherwise this is the proper priority for those converters
-		if(!dexState.hasMagics("Claris clip art"))
-			r.push(...clarisClipArtConverters);
+		// If we haven't converted yet, we are unlikely to convert at this point
+		//if(!dexState.hasMagics("Claris clip art"))
+		//	r.push("soffice[matchType:magic][outType:png]");
 
-		r.push(
-			"tomsViewer[matchType:magic]",		// For some PICTS will only produce the 'thumbnail' (samples 35, 039 and 06).
-			"nconvert[format:pict]",	// nconvert produces just a black image PICT v2 format picts: p#.pic
-			"convert"	// convert has a habit of just producing a black square
-		);
+		//r.push(
+		//	"tomsViewer[matchType:magic]",		// For some PICTS will only produce the 'thumbnail' (samples 35, 039 and 06).
+		//	"nconvert[format:pict]",	// nconvert produces just a black image PICT v2 format picts: p#.pic
+		//	"convert"	// convert has a habit of just producing a black square
+		//);
 		return r;
 	};
 }

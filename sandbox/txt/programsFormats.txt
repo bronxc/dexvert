@@ -7765,6 +7765,41 @@ tiff : tif, tiff, tx, env, sm, vsm
 zfile : zfile
 
 
+>>> imconv ::: media-gfx/imtools-3.0 ::: ftp://ftp.sdsc.edu/pub/sdsc/graphics/imtools
+Format  Description
+------------------------------------------------------------------------
+bmp     Windows bitmap image file
+cur     Windows cursor image file
+eps     Encapsulated PostScript file
+gif     Graphics Image File
+hdf     Hierarchical Data File
+ico     Windows icon image file
+icon    Sun Icon and Cursor file
+iff     Sun TAAC Image File Format
+jpeg    JPEG Image File Format
+miff    ImageMagick's MIFF file format
+mpnt    Apple Macintosh MacPaint file
+pbm     PBM Portable Bit Map file
+pcx     ZSoft IBM PC Paintbrush file
+pic     PIXAR picture file
+pict    Apple Macintosh QuickDraw/PICT file
+pix     Alias image file
+ps      Adobe PostScript file
+ras     Sun Rasterfile
+rgb     SGI RGB image file
+rla     Wavefront raster image file
+rle     Utah Run length encoded image file
+si      SoftImage's image file format
+synu    SDSC Synu image file
+tga     Truevision Targa image file
+tiff    Tagged image file
+viff    Khoros Visualization image file
+x       AVS X image file
+xbm     X11 bitmap file
+xpm     X11 pixmap file
+xwd     X Window System window dump image file
+
+
 >>> kss2wav ::: dev-libs/libkss-1.3.0_p20260721 ::: https://github.com/digital-sound-antiques/libkss
 | Format      | File extension | Notes                                         |
 | ----------- | -------------- | --------------------------------------------- |

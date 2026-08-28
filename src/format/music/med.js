@@ -6,7 +6,8 @@ export class med extends Format
 	website      = "http://fileformats.archiveteam.org/wiki/OctaMED_module_(MED)";
 	ext          = [".med", ".mmd1", ".mmd2", ".mmd3", ".mmd4", ".mmdc"];
 	matchPreExt  = true;
-	magic        = ["OctaMED Pro music file", /OctaMED MMD[0123C] module/, "OctaMED Music Editor module", "MED_Song", "OctaMED Soundstudio music file", "MED music file", "OctaMED Soundstudio compressed module", "OctaMED Soundstudio compressed file"];
+	magic        = ["OctaMED Pro music file", /OctaMED MMD[0123C] module/, "OctaMED Music Editor module", "MED_Song", "OctaMED Soundstudio music file", "MED music file", "OctaMED Soundstudio compressed module",
+		"OctaMED Soundstudio compressed file", "audio/x-med"];
 	metaProvider = ["musicInfo"];
 	converters   = ["xmp", "openmpt123", "zxtune123", "uade123"];
 }

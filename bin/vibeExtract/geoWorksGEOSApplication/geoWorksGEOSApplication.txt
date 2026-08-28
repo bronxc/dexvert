@@ -1,0 +1,597 @@
+PC/GEOS 2.x Executable Geode File Format
+=========================================
+
+Scope
+-----
+
+This specification describes the PC/GEOS 2.x executable-geode container. The
+usual filename suffix is .GEO, but the suffix is not part of the format and
+other suffixes are valid. This specification does not describe PC/GEOS 1.x
+geodes, GEOS VM documents, byte-stream files, or directory-information files.
+It does describe the standard LMem, VisMoniker, GString, and inline Bitmap
+structures used for user-interface text and artwork inside executable
+resources. A program may also define private payload structures; those have
+no container-wide type tag.
+
+The format is a 16-bit little-endian segmented executable. It contains a
+standard 256-byte GEOS file header, an 88-byte executable/geode header tail,
+import and export tables, four parallel resource descriptor arrays, and a
+sequence of resource payloads with runtime relocation tables.
+
+All integers are unsigned and little-endian unless a field is explicitly
+described otherwise. All offsets in this document are byte offsets. A "word"
+is 2 bytes and a "dword" is 4 bytes.
+
+
+Identification and fail-fast recognition
+----------------------------------------
+
+A supported file has both of these properties:
+
+1. Bytes 0x000..0x003 are C7 45 C1 53. Interpreted as a little-endian dword,
+   the signature is 0x53C145C7. The bytes are the GEOS 2.x signature made from
+   "GEAS" with bit 7 set in the G and A characters.
+2. The word at 0x028 is 1, GFT_EXECUTABLE.
+
+The signature by itself identifies a GEOS 2.x file but does not prove that the
+file is an executable geode. A parser for this specification must reject other
+values of the common-header file-type word instead of trying to interpret a VM
+or data file as an executable.
+
+There is no whole-file checksum and no header checksum. The 16-bit value at
+0x12A is a build serial, not a CRC.
+
+
+Top-level layout
+----------------
+
+  Absolute range                         Contents
+  -------------------------------------  -------------------------------------
+  0x000..0x0FF                           GeosFileHeader2 (256 bytes)
+  0x100..0x157                           executable/geode header tail (88)
+  0x158..                                imported-library entries
+  immediately after imports             exported-entry far pointers
+  immediately after exports             four resource descriptor arrays
+  positions named by descriptor arrays  resource records
+
+The complete header through 0x157 is 344 bytes. Let:
+
+  L = imported-library count at 0x10A
+  E = exported-entry count at 0x10C
+  R = resource count at 0x108
+
+Then:
+
+  importTable       = 344
+  exportTable       = importTable + 14*L
+  resourceTable     = exportTable + 4*E
+  resourceSizeTable = resourceTable
+  resourcePosTable  = resourceTable + 2*R
+  resourceRelocSize = resourceTable + 6*R
+  resourceFlagTable = resourceTable + 8*R
+  endOfTables       = resourceTable + 10*R
+
+Counts and positions are authoritative. No signature scan, content scan, or
+filename-based inference is needed or permitted to locate tables or resources.
+
+
+Standard GEOS 2.x file header: 0x000..0x0FF
+------------------------------------------------
+
+  Offset  Size  Type              Field
+  ------  ----  ----------------  -------------------------------------------
+  0x000      4  byte[4]           signature: C7 45 C1 53
+  0x004     36  char[36]          long filename
+  0x028      2  word              GeosFileType; must be 1 here
+  0x02A      2  word flags        GeosFileHeaderFlags
+  0x02C      8  ReleaseNumber     major, minor, change, engineering words
+  0x034      4  ProtocolNumber    major, minor words
+  0x038      6  IconToken         file token
+  0x03E      6  IconToken         creator token
+  0x044    100  char/wchar[100]   user notes
+  0x0A8     32  char[32]          copyright/legal notice
+  0x0C8      2  packed word       creation date
+  0x0CA      2  packed word       creation time
+  0x0CC      8  char[8]           file password extended attribute
+  0x0D4     16  byte[16]          desktop-specific extended attribute
+  0x0E4     28  byte[28]          reserved for future use
+
+The long filename and user notes are fixed-size, null-terminated buffers. If
+GFHF_DBCS is clear, they contain single-byte PC/GEOS characters. If GFHF_DBCS
+is set, they contain 16-bit little-endian GEOS wide characters. The applicable
+character repertoire is product/locale dependent; a lossless tool must retain
+the raw bytes. Bytes after the first null terminator are not part of the text
+and may contain arbitrary old buffer contents. The notice and password are
+fixed-size single-byte buffers and may use all bytes without a terminator.
+
+IconToken is:
+
+  +0  4 bytes  token characters
+  +4  word     manufacturer ID
+
+The creation timestamp uses the DOS packed layout:
+
+  Date: bits 15..9 year since 1980; bits 8..5 month; bits 4..0 day.
+  Time: bits 15..11 hour; bits 10..5 minute; bits 4..0 seconds divided by 2.
+
+GeosFileHeaderFlags:
+
+  Mask    Meaning
+  ------  ---------------------------------------------------------------
+  0x8000  template
+  0x4000  shared by multiple users
+  0x2000  shared by one user / public
+  0x0800  GEOS-hidden attribute
+  0x0400  DBCS strings
+  0x0200  unread marker used by creators/viewers
+  0x0100  associated document-notes object exists
+
+All unlisted flag bits are reserved. The 16 desktop bytes are deliberately an
+opaque extended-attribute slot: the core format assigns their storage but not
+a universal substructure. The final 28 bytes likewise have no interpretation
+in this format revision and must be preserved.
+
+
+ExecutableFileHeader2: 0x100..0x117
+------------------------------------
+
+  Offset  Size  Type        Field
+  ------  ----  ----------  -----------------------------------------------
+  0x100      2  word flags  geode attributes
+  0x102      2  word        geode debugger/search category
+  0x104      2  word        heap-space requirement, in 16-byte paragraphs
+  0x106      2  word        unused; written as zero
+  0x108      2  word        resource count R
+  0x10A      2  word        imported-library count L
+  0x10C      2  word        exported-entry count E
+  0x10E      2  word        uninitialized-data allocation size
+  0x110      2  word        process class offset
+  0x112      2  word        process class resource ID
+  0x114      2  word        application object LMem chunk handle
+  0x116      2  word        application object resource ID
+
+Heap space is an admission-accounting estimate, not the size of a file range.
+Multiply it by 16 to obtain bytes. Uninitialized data is allocated after the
+initialized dgroup image and is absent from the file. For process geodes it
+also includes the initial-thread stack allocation arranged by the linker.
+
+The 0x102 category is supplied to the linker as a build/search category. Values
+1, 2, 3, and 4 conventionally select application, library, driver, and loader
+debugger directories, respectively; products may define additional values.
+The geode's executable roles are determined by the attribute bits, not by
+assuming this category is limited to the conventional values.
+
+Geode attributes:
+
+  Mask    Meaning
+  ------  ---------------------------------------------------------------
+  0x8000  has an initial process thread
+  0x4000  exports library routines
+  0x2000  has a driver table
+  0x1000  keep executable file open for discardable resources
+  0x0800  system geode / compiled into kernel
+  0x0400  may be launched more than once
+  0x0200  user-launched application
+  0x0100  driver aspect has been initialized (runtime state)
+  0x0080  library aspect has been initialized (runtime state)
+  0x0040  entire geode has been initialized (runtime state)
+  0x0020  uses a numeric coprocessor if present
+  0x0010  requires a coprocessor or emulator
+  0x0008  supports General Consumer Mode
+  0x0004  library/driver entry points use the C calling convention
+  0x0002  execute-in-place geode
+  0x0001  reserved
+
+
+On-disk GeodeHeader core: 0x118..0x157
+---------------------------------------
+
+This 64-byte area is copied into the in-memory geode core block. Several
+values duplicate the common and executable headers so that the loaded core
+block is self-contained.
+
+  Offset  Size  Type              Field
+  ------  ----  ----------------  -------------------------------------------
+  0x118      2  word              runtime geode handle; zero on disk
+  0x11A      2  word flags        copy of attributes at 0x100
+  0x11C      2  word              copy of category at 0x102
+  0x11E      8  ReleaseNumber     copy of release at 0x02C
+  0x126      4  ProtocolNumber    copy of protocol at 0x034
+  0x12A      2  word              linker build serial / debugger uniqueness ID
+  0x12C      8  char[8]           permanent geode name, space padded
+  0x134      4  char[4]           permanent name extension, space padded
+  0x138      6  IconToken         copy of token at 0x038
+  0x13E      2  signed word       runtime reference count; zero on disk
+  0x140      2  word              driver table offset
+  0x142      2  word              driver table resource ID
+  0x144      2  word              library initialization entry offset
+  0x146      2  word              library initialization entry resource ID
+  0x148      2  word              runtime export table offset; zero on disk
+  0x14A      2  word              copy of exported-entry count
+  0x14C      2  word              copy of imported-library count
+  0x14E      2  word              runtime import table offset; zero on disk
+  0x150      2  word              copy of resource count
+  0x152      2  word              runtime resource-handle table offset; zero
+  0x154      2  word              runtime resource-position table offset; zero
+  0x156      2  word              runtime relocation-size table offset; zero
+
+An undamaged linker's output has identical values in each original/copy pair.
+The serial is a low 16-bit timer-derived build identifier used to distinguish
+builds during debugging. It does not authenticate or validate any bytes.
+
+
+Imported-library table
+----------------------
+
+There are L entries of 14 bytes beginning at absolute offset 344:
+
+  +0   8 bytes  permanent library name, space padded
+  +8   word     required GeodeAttrs bits
+  +10  word     required protocol major
+  +12  word     required protocol minor
+
+The attribute word is a match requirement used while locating/loading the
+dependency. Import indices are zero-based. Runtime relocation entries name an
+import by storing this index in their extra byte.
+
+
+Exported-entry table
+--------------------
+
+There are E entries of 4 bytes immediately after the import table:
+
+  +0  word  offset within resource
+  +2  word  resource ID
+
+Each entry is a segmented far pointer expressed as resource:offset, with the
+offset word physically first. An all-zero entry is an intentionally empty
+export slot. Relocations to a library carry an export ordinal in the word at
+the relocation target; the loader resolves that ordinal through this table.
+
+
+Resource descriptor arrays
+--------------------------
+
+The resource descriptor area is four parallel arrays, not an interleaved
+array of 10-byte structures. For R resources, in order, it contains:
+
+1. R words: logical resource sizes.
+2. R dwords: stored resource positions.
+3. R words: relocation-table sizes in bytes.
+4. R words: resource allocation flags.
+
+Descriptor index is the resource ID. Resource positions are relative to the
+end of the 256-byte GeosFileHeader2, so:
+
+  absoluteResourcePosition = storedResourcePosition + 256
+
+The position rule applies only to position-table values. Header/table offsets
+and relocation target offsets use their directly stated bases.
+
+Resource 0 conventionally represents the core block already embodied by the
+geode header and therefore normally has a zero-length payload. Its position
+may equal resource 1's position. Resource 1 conventionally holds dgroup. These
+are semantic conventions; every descriptor is still present and must be
+reported, including a zero-length descriptor.
+
+Resource allocation flags combine HeapFlags in the low byte and HeapAllocFlags
+in the high byte:
+
+  Mask    Meaning
+  ------  ---------------------------------------------------------------
+  0x0001  currently swapped to memory backing store (not expected on disk)
+  0x0002  initially discarded; load from executable when needed
+  0x0004  debugger-associated (not expected in ordinary files)
+  0x0008  resource is an LMem heap
+  0x0010  may be swapped
+  0x0020  may be discarded
+  0x0040  may be shared
+  0x0080  fixed in memory
+  0x0100  conforming code
+  0x0200  code rather than data
+  0x0400  object resource
+  0x0800  read-only
+  0x1000  UI-thread object resource
+  0x2000  allocation must not report an error
+  0x4000  allocate locked
+  0x8000  zero-initialize allocation
+
+Common combinations include 0x0030 for a preloaded discardable/swapable block,
+0x0032 for a standard initially discarded block, and 0x0012 for initially
+discarded self-modifying data.
+
+
+Physical resource records, alignment, and slack
+------------------------------------------------
+
+For resource i, let:
+
+  P = 256 + stored position[i]
+  S = logical size[i]
+  A = (S + 15) & ~15
+  Q = relocation-table size[i]
+
+The physical pieces are:
+
+  P .. P+S-1       logical resource payload; extract exactly S bytes
+  P+S .. P+A-1     paragraph padding; 0 to 15 bytes
+  P+A .. P+A+Q-1   relocation table
+
+The loader uses S, not A, as the logical in-memory resource length. Paragraph
+padding is never part of the resource and may contain arbitrary bytes; it is
+not required to be zero.
+
+The next resource begins at its own authoritative position-table value. If
+that position is greater than P+A+Q, the intervening bytes are layout slack.
+Such slack can result when link-time processing reduces an LMem resource or
+its relocations after file positions were assigned. It has no runtime meaning,
+need not be interpreted, and must be preserved by a lossless container tool.
+The same rule accounts for bytes after the final relocation table through EOF.
+No heuristic should be used to merge paragraph padding or layout slack into a
+logical resource.
+
+Resource payloads can contain x86 code, initialized data, LMem heaps, object
+blocks, UI objects, graphics, strings, or product-defined data. Their internal
+syntax is selected by the program and resource flags and is not another layer
+of the executable-geode container. Extracting the S payload bytes losslessly
+is complete container-level extraction.
+
+
+Resource classification and standard nested structures
+---------------------------------------------------------
+
+An executable geode does not have a Windows-style resource directory whose
+entries carry semantic identifiers such as ICON, BITMAP, STRING, or SOUND.
+The resource descriptor's flags describe allocation and loader behavior: for
+example code, object, LMem, read-only, discardable, shared, or UI-thread. They
+do not say that a resource is an icon, sound, or string table. Symbolic names
+used in source code are not stored in the executable descriptor tables.
+
+There are nevertheless well-established structures inside many resources:
+
+* an LMem resource has an LMemBlockHeader and a table of chunk handles;
+* an object block is an LMem heap whose LMem type is LMEM_TYPE_OBJ_BLOCK;
+* text and graphic labels used by the UI are VisMoniker structures;
+* graphic VisMonikers contain a standard GString command stream; and
+* inline bitmap commands carry Bitmap or CBitmap records.
+
+These nested tags allow deterministic extraction of UI artwork and moniker
+text. They do not make untagged, application-private byte arrays into typed
+resources. Sound, document data, fonts, and custom sprite collections must be
+recognized from the private structure used by the program that owns them.
+
+
+LMem block and chunk layout
+----------------------------
+
+A resource whose allocation flags include 0x0008 normally begins with this
+16-byte LMemBlockHeader:
+
+  +0x00  word  runtime memory handle; a loader/runtime field
+  +0x02  word  offset of the chunk-handle table
+  +0x04  word  LocalMemoryFlags
+  +0x06  word  LMemType
+  +0x08  word  total LMem block size
+  +0x0A  word  number of allocated handle-table entries
+  +0x0C  word  local pointer to the first free block, or zero
+  +0x0E  word  total free bytes
+
+Standard LMemType values are:
+
+  0  general-purpose LMem
+  1  window block
+  2  object block
+  3  graphics-state block
+  4  font block
+  5  graphics-string block
+  6  database-items block
+
+The handle table is an array of words beginning at LMBH_offset. A handle is
+the address of its word in that table. Its word is a local pointer to chunk
+data. Values 0 and FFFF represent unused/empty handles. For a live pointer D,
+the word at D-2 is LMC_size. LMC_size includes its own 2-byte size word, so the
+chunk's allocated data length is LMC_size-2 and its bytes occupy
+D..D+LMC_size-3. A chunk can contain one standard object, multiple consecutive
+objects, or an application-defined structure; the handle table itself does
+not assign semantic chunk types.
+
+
+VisMoniker text and graphics
+-----------------------------
+
+A complete VisMoniker starts with:
+
+  +0  byte  VisMonikerType
+  +1  word  cached width
+  +3  ...   VisMonikerText or VisMonikerGString
+
+VisMonikerType bit 7 identifies a moniker list entry and bit 6 selects a
+graphic GString rather than text. Bits 5..4 describe graphic aspect ratio and
+bits 3..0 describe the minimum display/color class.
+
+For a text moniker, byte +3 is the mnemonic offset and a null-terminated
+string begins at +4. Mnemonic values FD, FE, and FF respectively mean the
+standard Cancel mnemonic, a mnemonic not contained in the displayed text,
+and no mnemonic. SBCS PC/GEOS uses the Extended BSW repertoire. Its byte
+assignments correspond to the Macintosh Roman mapping for the characters
+needed to decode these files; preserving the original bytes remains the
+lossless representation. DBCS geodes instead use little-endian wide
+characters as selected by GFHF_DBCS.
+
+For a graphic moniker, the word at +3 is the cached height and the GString
+begins at +5. GString opcode 0 ends the stream. The inline bitmap operations
+relevant to a one-image moniker are:
+
+  Opcode  Name                  Bytes before the Bitmap
+  ------  --------------------  ------------------------------------
+     76   GR_FILL_BITMAP        opcode, x word, y word, size word
+     77   GR_FILL_BITMAP_CP     opcode, size word
+     80   GR_DRAW_BITMAP        opcode, x word, y word, size word
+     81   GR_DRAW_BITMAP_CP     opcode, size word
+
+The size word is the number of bytes in the immediately following Bitmap,
+including its header. CP means that the current graphics position supplies
+the coordinates. Fill operations use the set bits of a monochrome bitmap as a
+shape filled with the current drawing color; draw operations copy bitmap
+colors. Other GString opcodes can construct artwork from vector primitives or
+refer to an object/pointer instead of carrying an inline bitmap. Such streams
+remain valid GStrings but are not an inline raster image.
+
+
+Simple inline Bitmap layout
+----------------------------
+
+The six-byte Bitmap header is:
+
+  +0  word  B_width, in pixels
+  +2  word  B_height, in scan lines
+  +4  byte  B_compact
+  +5  byte  B_type
+  +6  ...   scan-line data
+
+B_compact is 0 for uncompressed data, 1 for Macintosh/GEOS PackBits, 2 for
+LZG, and 80 or greater for a user-defined compactor. PackBits is decoded one
+complete output scan line at a time. A control byte 00..7F copies the next
+control+1 literal bytes. A control byte 80..FF repeats the following byte
+257-control times; in GEOS, 80 is therefore a 129-byte repeat rather than a
+no-op.
+
+B_type has these masks:
+
+  0x40  a palette is supplied (meaningful for a complex bitmap)
+  0x20  pixels reside in an external HugeArray
+  0x10  each scan line includes a one-bit visibility mask
+  0x08  CBitmap complex/sliced header and data organization
+  0x07  BMFormat
+
+BMFormat values are 0 monochrome, 1 four-bit indexed, 2 eight-bit indexed,
+3 24-bit RGB, 4 four one-bit CMYK planes, and 5 three one-bit CMY planes.
+Pixels and mask bits run most-significant bit first within a byte. Odd-width
+four-bit images put the left pixel in the high nibble. If a mask is present,
+its ceil(width/8) bytes precede the color bytes on each scan line; a set mask
+bit makes the corresponding pixel visible.
+
+For a simple uncompressed bitmap, the color portion of a scan line is:
+
+  Format       Bytes
+  -----------  --------------------------------
+  monochrome   ceil(width/8)
+  4-bit        ceil(width/2)
+  8-bit        width
+  24-bit RGB   3*width, byte order red, green, blue
+  4CMYK        4*ceil(width/8)
+  3CMY         3*ceil(width/8)
+
+For indexed images without an attached complex-bitmap palette, GEOS uses its
+system palette. Indices 0..15 are the standard EGA-like colors, 16..31 are a
+16-step gray ramp, and 32..39 are reserved. Indices 40..255 are the 6x6x6 RGB
+cube with channel levels 00, 33, 66, 99, CC, and FF, ordered with red
+outermost and blue innermost. Simple monochrome scan lines use set bits for
+black and clear bits for white when drawn directly.
+
+A CBitmap extends the six-byte header with slice range, device-information,
+data, palette, and resolution fields. HugeArray, complex/sliced, LZG, and
+user-defined compactors require the corresponding external or product-level
+structures. They cannot be decoded as a simple inline Bitmap merely from the
+six-byte header.
+
+
+Runtime relocation table
+------------------------
+
+The relocation size Q must be divisible by 4. Each entry is:
+
+  +0  byte  info: high nibble source, low nibble type
+  +1  byte  extra
+  +2  word  offset of the relocation within the logical resource
+
+Source nibble:
+
+  0  kernel. The word at the target is a kernel export ordinal. This source
+     is obsolete in later kernels but remains part of the file format.
+  1  imported library. extra is the zero-based imported-library index; the
+     word at the target is an export ordinal. Ordinal FFFF denotes the
+     imported library's core-block handle where a handle relocation permits it.
+  2  another resource in the same geode. extra is zero; the word at the target
+     is a resource ID.
+
+Type nibble:
+
+  0  GRT_FAR_PTR. Relocate a 4-byte offset:segment far pointer. Used for a
+     fixed kernel/library target; not valid for an ordinary resource target.
+  1  GRT_OFFSET. Replace a 2-byte word with an exported routine's offset.
+     Used for kernel/library targets, not geode-resource targets.
+  2  GRT_SEGMENT. Replace a 2-byte word with the target segment or the GEOS
+     virtual-segment encoding of a movable handle.
+  3  GRT_HANDLE. Replace a 2-byte word with the target memory handle.
+  4  GRT_CALL. Relocate a possibly movable 5-byte far-call instruction. The
+     entry offset points to the first word after the opcode, so the affected
+     byte span is offset-1 through offset+3. Fixed targets become normal far
+     pointers. Movable targets become a GEOS resource-call software interrupt
+     encoding carrying the handle and destination offset.
+  5  GRT_LAST_XIP_HANDLE. Replace a 2-byte word with the last handle in an
+     execute-in-place resource image.
+
+The extra byte is the import index for source 1 and is reserved as zero for
+sources 0 and 2. Relocations are applied at load time; an extractor should keep
+both the unrelocated resource bytes and the raw relocation stream. Applying
+relocations would make output dependent on runtime handles and loaded library
+addresses and is therefore not part of lossless extraction.
+
+
+Bounds, truncation, and damage
+------------------------------
+
+For an intact file:
+
+* the import, export, and all four descriptor arrays fit before resource data;
+* copied header fields agree with their originals;
+* resource positions are nondecreasing, allowing a zero-length resource to
+  share the following resource's position;
+* each relocation size is a multiple of 4;
+* each relocation target lies within its resource and has enough bytes for its
+  relocation type; and
+* every input byte belongs to a header, a table, resource data, paragraph
+  padding, a relocation table, or layout slack.
+
+A damaged parser can still extract a resource only from explicit fields that
+are available: its size word and position dword locate payload bytes, while its
+relocation-size word locates relocation bytes after paragraph alignment. It
+must clamp reads at EOF, identify partial output, and never scan for guessed
+resource boundaries. A missing later parallel array does not change the base
+calculation for any earlier array because all array offsets derive from R.
+
+
+Lossless extraction convention
+------------------------------
+
+A normal extractor output is user-facing: every standardized complete inline
+bitmap VisMoniker is converted to a PNG directly in the output directory, and
+all complete text VisMonikers plus conservatively recognized printable
+resource strings are collected in one UTF-8 text.txt file. That file contains
+only the extracted text values, separated by blank lines; it has no generated
+heading, explanatory preamble, or source labels. A short PNG name has the form
+RRRRR_IIII.png, where RRRRR is the resource ID and IIII is the image sequence
+number. Link-time symbolic chunk names are absent from a geode.
+
+With --all, the extractor additionally emits one resource_NNNNN.bin for every
+available descriptor (including a valid empty resource) and one
+resource_NNNNN.reloc.bin for each available nonempty relocation stream. The
+resource files contain exactly the logical S bytes and do not include
+paragraph padding. PNGs remain directly in the output directory but receive
+long diagnostic names containing their resource, LMem handle, chunk offset,
+sequence number, and dimensions.
+
+The --all output also includes the common header, geode header tail, import
+table, export table, descriptor arrays, paragraph padding, layout slack, JSON
+metadata, and an HTML index. Together with the logical resources and
+relocation streams, those raw ranges account for every original byte without
+interpreting padding as program data. None of these generated metadata or raw
+forensic files is emitted during ordinary extraction.
+
+PNG and UTF-8 text are convenience derivatives, not substitutes for the raw
+resource bytes. An embedded bitmap whose own size, dimensions, compression,
+or enclosing chunk bounds are contradictory must be reported and left raw,
+not repaired by guessing. A printable-string pass likewise cannot assign
+application semantics to arbitrary text, so text.txt is a convenience view
+rather than a typed string-resource table.

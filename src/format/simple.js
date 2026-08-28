@@ -47,7 +47,6 @@ export default
 		formMasterForm           : {name : "Form Master Form", ext : [".frm"], magic : ["Form Master Form"]},
 		fourDWriteDocument       : {name : "4D Write document", magic : ["4D Write document"], idMeta : ({macFileType, macFileCreator}) => macFileType==="4WRT" && ["Twri", "B.G.", "BGCV"].includes(macFileCreator)},
 		frameMakerBook           : {name : "FrameMaker Book", ext : [".book"], magic : ["FrameMaker book"], idMeta : ({macFileType, macFileCreator}) => macFileType==="FBok" && ["Fra5", "Fram"].includes(macFileCreator)},
-		geoWorksGeoWriteDocument : {name : "GeoWorks GeoWrite document", ext : [".000"], magic : ["GeoWorks GeoWrite document"]},
 		goldDiskSpreadsheet      : {name : "Gold Disk Spreadsheet", ext : [".adv", ".pcf"], magic : ["Gold Disk Office Calc/Graph spreadsheet"]},
 		heliosTextpadWorkspace   : {name : "Helios Textpad Workspace", ext : [".tws"], magic : ["Helios Textpad Workspace Datei"], weakMagic : true},
 		helmMultimediaBook       : {name : "Helm Multimedia Book", magic : ["Helm multimedia book"]},

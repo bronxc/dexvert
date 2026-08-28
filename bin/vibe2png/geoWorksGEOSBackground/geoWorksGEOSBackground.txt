@@ -1,0 +1,456 @@
+PC/GEOS FIELD BACKGROUND FILE FORMAT
+====================================
+
+Status and scope
+----------------
+
+This document describes the byte-level format used by PC/GEOS Field
+background files: a GEOS 2.x standard file header, a VM container, a Field
+background map block, and a standard GString.  It also describes the older
+protocol-0 chained GString representation that can occur inside the same
+GEOS 2.x VM container.
+
+All multibyte integers are little-endian.  "word" is an unsigned 16-bit
+integer, "sword" is a signed 16-bit integer, "dword" is an unsigned 32-bit
+integer, and "sdword" is a signed 32-bit integer.  Unless explicitly called a
+file offset, every VM position is relative to file offset 0x100, the byte just
+after the 256-byte GEOS header.
+
+Fixed-point values use these packed layouts:
+
+  WBFixed   byte fraction, then signed 16-bit integer       (3 bytes)
+  WWFixed   word fraction, then signed 16-bit integer       (4 bytes)
+  DWFixed   word fraction, then signed 32-bit integer       (6 bytes)
+
+For example, a WWFixed value is integer + fraction/65536.
+
+
+1. GEOS 2.x standard file header (file offsets 0x000-0x0ff)
+----------------------------------------------------------------
+
+Offset  Size  Type     Meaning
+------  ----  -------  -----------------------------------------------------
+0x000      4  bytes    Signature C7 45 C1 53 (high-bit "GEAS")
+0x004     36  bytes    Fixed-size long-name buffer
+0x028      2  word     GEOS file type; 2 means VM file, 1 means executable
+0x02a      2  word     File flags
+0x02c      8  4 words  Release number: major, minor, change, engineering
+0x034      4  2 words  Protocol number: major, minor
+0x038      6  bytes    Token: four characters and manufacturer word
+0x03e      6  bytes    Creator token in the same representation
+0x044    100  bytes    User-notes buffer
+0x0a8     32  bytes    Copyright/notice buffer
+0x0c8      2  word     Packed creation date
+0x0ca      2  word     Packed creation time
+0x0cc      8  bytes    Password buffer
+0x0d4     16  bytes    Desktop/private buffer
+0x0e4     28  bytes    Reserved bytes
+
+A Field background has file type 2 and token bytes "BKGD 00 00".  Protocol
+1.0 selects the HugeArray GString representation.  Protocol 0.0 selects the
+older chained GString representation described in section 8.  Fixed buffers
+are fields in their own right; unused tail bytes need not form another
+structure.
+
+
+2. VM fixed header (file offsets 0x100-0x117)
+------------------------------------------------
+
+Offset  Size  Type       Meaning
+------  ----  ---------  ---------------------------------------------------
+0x100      2  word       VM signature, 0xadeb
+0x102      2  word       Allocated byte size of the VMHeader block
+0x104      4  dword      VMHeader position relative to file offset 0x100
+0x108      2  word       Update counter
+0x10a      2  word       Update operation type
+0x10c     12  6 words    Reserved VM words
+
+The physical VMHeader file offset is 0x100 + the dword at 0x104.  The
+position must point directly to a 0x00fb VMHeader signature; searching nearby
+for that signature is not valid recovery.
+
+
+3. VMHeader and VM block records
+--------------------------------
+
+VMHeader fixed portion:
+
+Offset  Size  Type    Meaning
+------  ----  ------  -------------------------------------------------------
++0x00      2  word    Header signature, 0x00fb
++0x02      2  word    First assigned-free block-record handle
++0x04      2  word    Last assigned-free block-record handle
++0x06      2  word    First unassigned block-record handle
++0x08      2  word    Non-inclusive end of active block-record handles
++0x0a      2  sword   Number of assigned-free records
++0x0c      2  sword   Number of unassigned records
++0x0e      2  sword   Number of used records
++0x10      2  sword   Cached number of resident records
++0x12      2  sword   Cached number of extra records
++0x14      2  word    Map-block handle
++0x16      2  word    Compaction threshold percentage
++0x18      4  dword   Sum of the allocated sizes of all used blocks
++0x1c      1  byte    VM attributes
++0x1d      1  byte    Nonzero if compression is disabled
++0x1e      2  word    Database map-block handle, or zero
++0x20   ...   records Active 12-byte VM block records
+
+A VM handle is the byte offset of its 12-byte record from the start of this
+VMHeader.  Consequently, valid handles begin at 0x20 and increase by 12.  The
+value at +0x08 is the active table end, not necessarily the allocated
+VMHeader size.  Up to 15 allocation-alignment bytes can follow the active
+table inside the VMHeader block.
+
+Used record (signature byte is 0xfe or 0xff):
+
+Offset  Size  Type   Meaning
+------  ----  -----  --------------------------------------------------------
++0x00      2  word   Cached memory handle; runtime bookkeeping
++0x02      1  byte   0xff used signature, or 0xfe dirty-used signature
++0x03      1  byte   VMB flags (bit 0 is the LMem hint)
++0x04      2  word   Client VM user ID
++0x06      2  word   Allocated block size
++0x08      4  dword  Block position relative to file offset 0x100
+
+Free record (byte +0x02 is below 0xfe):
+
+Offset  Size  Type   Meaning
+------  ----  -----  --------------------------------------------------------
++0x00      2  word   Next free-record handle
++0x02      2  word   Previous free-record handle
++0x04      4  dword  Allocated size; zero means an unassigned handle
++0x08      4  dword  Position relative to file offset 0x100
+
+Assigned-free records track unused extents in the file and form a doubly
+linked list.  Unassigned records have no extent and form a singly linked list
+through their first word.  Used extents and assigned-free extents, including
+the VMHeader's own extent, partition every byte from relative position 24 to
+end of file without gaps or overlaps.  This property makes it possible to
+account for allocator bytes without pretending that they are payload fields.
+
+The record at handle 0x20 describes the VMHeader itself.  Its modern user ID
+is 0xadeb; the protocol-0 variant uses zero.  The VMHeader allocation may be
+larger than its active block-record table.  A used VM block can likewise be
+larger than the logical LMem block stored in it.  Such tails are VM allocator
+slack: they are owned and sized by the enclosing VM record, have no inner
+fields, and may retain arbitrary old bytes.
+
+
+4. Field background map block
+-----------------------------
+
+The VMHeader map handle selects an ordinary VM block.  Its payload begins:
+
+Offset  Size  Type   Meaning
+------  ----  -----  --------------------------------------------------------
++0x00      2  word   Background width in logical points/pixels
++0x02      2  word   Background height
++0x04      2  sword  X offset
++0x06      2  sword  Y offset
++0x08      2  word   FieldBGFormatType
++0x0a      2  word   First GString VM handle when type is zero
+
+FieldBGFormatType 0 is FBGFT_STANDARD_GSTRING and is the format documented
+here.  Type 1, FBGFT_BITMAP_SLICES, was declared but not supported by the
+original Field implementation.  Bytes after +0x0b, when present in the map
+block allocation, are VM allocator slack.
+
+The Field draws the GString at (-xOffset,-yOffset).  The width and height are
+the PNG canvas dimensions.  Transparency in the produced PNG represents
+pixels on which the GString performs no output; the desktop's separately
+configured background color is not stored in this file.
+
+
+5. LMem block representation
+-----------------------------
+
+Modern GStrings are HugeArrays whose directory and data blocks are local
+memory (LMem) heaps.  Every such block begins with:
+
+Offset  Size  Type   Meaning
+------  ----  -----  --------------------------------------------------------
++0x00      2  word   On disk, the next VM-chain handle
++0x02      2  word   Offset of the LMem handle table
++0x04      2  word   LMem flags; bit 8 (0x0100) is LMF_IS_VM
++0x06      2  word   LMem type; zero is the general heap used here
++0x08      2  word   Logical LMem block size
++0x0a      2  word   Number of two-byte LMem handles
++0x0c      2  word   Pointer to first free chunk, or zero
++0x0e      2  word   Sum of rounded sizes of all free chunks
+
+The block-specific header occupies the area before the LMem handle table.
+An LMem handle-table entry contains a chunk pointer, zero for an unused
+handle, or 0xffff for an allocated handle with no memory.  A live chunk
+pointer points to the payload; the word immediately before it is the stored
+chunk size, including that size word.  The allocation consumed by a chunk is
+round_up_to_4(stored_size).
+
+A free-list pointer also points two bytes after its size word.  Its first
+payload word is the next free-chunk pointer.  Free chunks are sorted by
+address.  Live and free chunks exactly partition the heap from the byte after
+the handle table through the logical LMem size.  Bytes between logical LMem
+size and the enclosing VM allocation size are VM allocation slack.
+
+
+6. Protocol 1.0 HugeArray GString
+---------------------------------
+
+The map block's GString handle points to a VM user-ID 0xff03 directory block.
+The directory is an LMem block with two handles; the first is live and the
+second is zero.  Its block-specific fields are:
+
+Offset  Size  Type   Meaning
+------  ----  -----  --------------------------------------------------------
++0x10      2  word   First HugeArray data-block handle
++0x12      2  word   Handle of the directory ChunkArray (the LMem table offset)
++0x14      2  word   Extended-directory link; zero in this implementation
++0x16      2  word   Self VM handle
++0x18      2  word   Fixed element size; zero for variable GString elements
+
+The directory's live chunk begins with this eight-byte ChunkArrayHeader:
+
+  +0x00 word element count
+  +0x02 word element size, 8
+  +0x04 word current-enumeration offset, 0 on disk
+  +0x06 word first-data offset, 8
+
+Each eight-byte HugeArray directory element is:
+
+  +0x00 dword global index of the last GString element in this data block
+  +0x04 word  logical bytes used by the data block
+  +0x06 word  data-block VM handle
+
+The first entry is the sentinel (0xffffffff,0,0).  Later last-index values
+increase monotonically.  The first real entry agrees with the first-data
+field, and its VM-chain links agree in both directions.
+
+Data blocks have VM user ID 0xff04 and an LMem heap with two handles (one live,
+one zero).  Their block-specific header is:
+
+  +0x10 word next data-block handle (also copied at +0x00 on disk)
+  +0x12 word previous data-block handle
+  +0x14 word parent directory handle
+
+The handle table begins at +0x18.  Its live chunk is a variable-size
+ChunkArray.  Its header has count, elementSize=0, currentOffset=0, and
+dataOffset=8.  It is followed by count word offsets.  Offsets are relative to
+the start of the ChunkArray payload, point to consecutive GString elements,
+and ascend.  The last element ends at stored_chunk_size-2.  Thus every GString
+element has an exact size supplied by the container; opcode lengths are
+validated against, never guessed from, neighboring bytes.
+
+
+7. GString elements used by this background profile
+----------------------------------------------------
+
+Coordinates below are signed words unless noted.  "Point" is x,y.  The exact
+element layouts are:
+
+Opcode  Size/layout                              Operation
+------  ---------------------------------------  ----------------------------
+00      1                                        End GString
+03      1 + four coordinates                     Set declared GString bounds
+0e      1 + escapeCode:word + size:word + data   Escape; drawing playback no-op
+11      1 + xScale:WWFixed + yScale:WWFixed      Pre-apply scale
+12      1 + x:WWFixed + y:WWFixed                Pre-apply translation
+13      1 + TransMatrix (28 bytes)               Pre-apply transform
+14      1 + x:sdword + y:sdword                  Pre-apply integer translation
+18      1                                        Initialize default transform
+19      1                                        Save transform
+1a      1                                        Restore transform
+20      1 + Point + Point                        Draw line
+27      1 + count:word + count Points            Draw polyline
+2c      1 + left,top,right,bottom                Draw rectangle
+32      1 + four Points                          Draw cubic Bezier
+33      1 + three Points                         Cubic Bezier from current point
+35      1 + left,top,right,bottom                Draw ellipse
+3e      variable; described below                Draw text field
+41      1                                        Draw current path
+42      1 + left,top,right,bottom                Fill rectangle
+47      1 + count:word + rule:byte + Points      Fill polygon
+48      1 + left,top,right,bottom                Fill ellipse
+49      1 + RegionFillRule:byte                  Fill current path
+4c      1 + Point + size:word + CBitmap          Fill bitmap at Point
+4d      1 + size:word + CBitmap                  Fill bitmap at current point
+50      1 + Point + size:word + CBitmap          Draw bitmap at Point
+51      1 + size:word + CBitmap                  Draw bitmap at current point
+54      1 + size:word + CBitmap                  Continuation bitmap slice
+60      1                                        Save graphics state
+61      1                                        Restore graphics state
+62      1 + MixMode:byte                         Set mix mode
+63      1 + Point                                Move current point
+69      1 + red,green,blue                       Set line RGB
+6a      1 + SysDrawMask:byte                     Set line mask
+6b      1 + ColorMapMode:byte                    Set line color-map mode
+6c      1 + width:WWFixed                        Set line width
+6d      1 + LineJoin:byte                        Set line join
+6e      1 + LineEnd:byte                         Set line end
+6f      1 + LineAttr (13 bytes)                  Set all line attributes
+70      1 + limit:WWFixed                        Set miter limit
+75      1 + red,green,blue                       Set area RGB
+76      1 + SysDrawMask:byte                     Set area mask
+77      1 + ColorMapMode:byte                    Set area color-map mode
+78      1 + AreaAttr (6 bytes)                   Set all area attributes
+7b      1 + patternType:byte + patternData:byte  Set area pattern
+7e      1 + SysDrawMask:byte                     Set text mask
+81      1 + setBits:byte + clearBits:byte        Set text mode
+82      1 + WBFixed                              Set text space padding
+a0      1 + combine:word + flags:byte + unused   Begin path
+a1      1                                        End path
+a2      1 + combine:word + rectangle             Set clip rectangle
+a6      1 + fillRule:byte + combine:word         Set window clip from path
+
+TransMatrix is e11,e12,e21,e22 as four WWFixed values, followed by e31,e32 as
+two DWFixed values.  A point is transformed as:
+
+  x' = x*e11 + y*e21 + e31
+  y' = x*e12 + y*e22 + e32
+
+Apply operations pre-multiply this matrix, matching GEOS/PostScript order.
+
+LineAttr bytes are ColorFlag, RGBValue[3], SysDrawMask, ColorMapMode, LineEnd,
+LineJoin, LineStyle, and width:WWFixed.  AreaAttr is ColorFlag, RGBValue[3],
+SysDrawMask, and ColorMapMode.  ColorFlag 0x80 means RGB; zero means the first
+RGB byte is a palette index.  SysDrawMask's high bit requests inversion and
+the low seven bits select a system 8x8 mask.  Values 25 and 89 are respectively
+100% and 0%; value 57 is 50%.
+
+GR_DRAW_TEXT_FIELD begins with the opcode and this 14-byte GDF_saved value:
+
+  +0x01 nChars:word
+  +0x03 drawX:WBFixed
+  +0x06 drawY:WBFixed
+  +0x09 baseline:WBFixed
+  +0x0c underline/strike limit:word
+  +0x0e HyphenFlags:byte
+
+Starting at +0x0f are style runs until their character counts total nChars.
+Each run is runChars:word, a 24-byte TextAttr, then runChars SBCS text bytes.
+TextAttr contains ColorQuad[4], mask:byte, GraphicPattern[2], styleSet:byte,
+styleClear:byte, modeSet:byte, modeClear:byte, spacePad:WBFixed, fontID:word,
+pointSize:WBFixed, trackKern:sword, fontWeight:byte, fontWidth:byte, and one
+alignment byte.  The file stores font IDs and layout attributes but not glyph
+outlines; exact playback therefore requires external GEOS font resources.
+
+
+8. CBitmap and bitmap slices
+----------------------------
+
+All serialized bitmaps in this profile use the 20-byte complex header:
+
+Offset  Size  Type   Meaning
+------  ----  -----  --------------------------------------------------------
++0x00      2  word   Full bitmap width in pixels
++0x02      2  word   Full bitmap height in pixels
++0x04      1  byte   BMCompact: 0 raw, 1 GEOS/Macintosh PackBits
++0x05      1  byte   BMType bit field
++0x06      2  word   First scan represented by this slice
++0x08      2  word   Number of scans in this slice
++0x0a      2  word   Runtime device-info scratch value
++0x0c      2  word   Offset from this header to scan data
++0x0e      2  word   Offset from this header to palette data
++0x10      2  word   Horizontal resolution in pixels per inch
++0x12      2  word   Vertical resolution in pixels per inch
+
+BMType bits:
+
+  0x40  palette is present
+  0x20  HugeBitmap marker
+  0x10  per-scan transparency mask is present
+  0x08  complex (sliced) header is present
+  0x07  pixel format: 0 mono, 1 four-bit indexed, 2 eight-bit indexed,
+        3 24-bit RGB, 4 four-component CMYK, 5 three-component CMY
+
+The current profile uses formats 0, 1, and 2.  Palette data is a count:word
+followed by count RGB triples.  The palette and scan-data offsets are relative
+to the CBitmap start.  CB_devInfo, and CB_palette when the palette bit is
+clear, are inactive runtime scratch values and need not be zero.  Zero-scan
+initial headers are valid: they carry dimensions/palette, and following opcode
+54 elements carry the scans.  Slices must agree on dimensions, format, mask,
+and resolution and must cover every scan exactly once.
+
+Uncompressed bytes per scan are:
+
+  mono       ceil(width/8)
+  four-bit   ceil(width/2), high nibble is the left pixel
+  eight-bit  width
+
+If the mask bit is set, ceil(width/8) mask bytes precede the pixel bytes on
+each scan.  Bits are most-significant first.  A one mask bit permits output;
+a zero is transparent.  A monochrome draw outputs black only for one bits and
+does nothing for zero bits.  A monochrome fill outputs the current area color
+only for one bits.  Indexed color without a store mask is opaque.
+
+Bitmap resolution affects logical size.  Before the GString transform, one
+source pixel spans 72/xResolution logical units horizontally and
+72/yResolution units vertically.
+
+When no explicit palette exists, indices 0-15 are the standard EGA RGB
+values using levels 00, 55, aa, ff; indices 16-31 are grayscale 00,11,...,ff;
+indices 32-39 are black; and indices 40-255 are a 6x6x6 RGB cube using levels
+00,33,66,99,cc,ff with red as the outer, green the middle, and blue the inner
+loop.
+
+PackBits is reset at every scan and has no stored compressed-length prefix.
+Decode packets until exactly the calculated uncompressed scan size exists:
+
+  signed control >= 0: copy control+1 literal bytes
+  signed control <  0: repeat the following byte 1-control times
+
+GEOS deliberately treats control -128 as a 129-byte repeat; it is not the
+no-op interpretation used by some later PackBits descriptions.  A packet may
+not cross a scan boundary, and all compressed bytes in the slice must be
+consumed.
+
+
+9. Protocol 0.0 chained GString
+--------------------------------
+
+The map's GString handle selects the first ordinary VM block in a chain.  Each
+block starts:
+
+  +0x00 word next VM handle
+  +0x02 word used-end offset from the start of this block
+  +0x04 ... stream bytes
+
+Bytes from used-end through the allocated VM-block end are allocator slack.
+The first stream byte is legacy GR_DRAW_BITMAP_CP opcode 0x1a, followed by a
+word CBitmap byte size and that many bytes.  Continuation blocks omit the
+opcode and begin with another size word and CBitmap.  The final bitmap is
+followed by the one-byte GString end opcode 0x00.  Some original background
+writers leave 0x00ff, rather than zero, in the final block's next field; it is
+an established terminal-marker defect and is accepted only when a complete
+end opcode is present in that same block.
+
+The protocol-0 first CBitmap can carry a fixed 16-entry RGB palette in the 48
+bytes from offsets 20 through 67, with data offset 68 and palette offset 20,
+even though its palette BMType bit is clear.  Later slices have data offset 20.
+All other CBitmap, mask, PackBits, and scan-coverage rules remain the same.
+
+
+10. Strict conversion and current limits
+----------------------------------------
+
+A strict reader validates both signatures, token/type/protocol, all VM record
+counts and chains, exact file-extent coverage, the map block, LMem live/free
+coverage, both directions of HugeArray chains, directory indices and byte
+counts, every variable ChunkArray element boundary, each opcode's exact size,
+all bitmap offsets, palettes, decompression boundaries, and complete scan
+coverage.  It must not scan for replacement pointers or leave partial output
+after failure.
+
+The accompanying converter implements every non-text GString operation listed
+in section 7 that is needed by this profile, both GString storage generations,
+raw and PackBits bitmap data, masks, palettes, DPI scaling, transforms, paths,
+clipping, and vector primitives.  It intentionally rejects GR_DRAW_TEXT_FIELD
+because the exact glyphs live in external GEOS font files, not in the
+background.  It also rejects valid standard GString opcodes not listed in
+section 7, non-copy mix modes, dither masks other than the solid/empty cases
+needed for converted output, and bitmap pixel/compaction formats other than
+those listed above.  These are fail-fast limits, not guessed fallbacks.
+
+To extend exact conversion, supply and decode the appropriate GEOS font
+resources and implement the GEOS text/font manager for text fields; then add
+remaining standard GString operators and GEOS raster operations with their
+documented state semantics.  Files that use those features should remain
+rejected until that work is complete.

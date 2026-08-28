@@ -1,4 +1,4 @@
-# Unsupported File Formats (3,948)
+# Unsupported File Formats (3,946)
 These formats can still be **detected** by dexvert, they just are not converted into modern ones.<br>
 Some are not converted because they are not very useful, or are specific to a single application.<br>
 Others are not converted because it was deemed low priority, or there are no known programs to do so.
@@ -339,7 +339,7 @@ Family/Format | Name | Extensions | Notes
 
 
 
-## Document (191)
+## Document (189)
 Family/Format | Name | Extensions | Notes
 ------------- | ---- | ---------- | -----
 [document/fourDOSHelp](https://discmaster.textfiles.com/search?format=fourDOSHelp) | 4DOS Help | .hlp | 
@@ -411,8 +411,6 @@ Family/Format | Name | Extensions | Notes
 [document/footprintIBMWorksSpreadSheet](https://discmaster.textfiles.com/search?format=footprintIBMWorksSpreadSheet) | Footprint/IBM Works Data Filer SpreadSheet | .lde | 
 [document/fullImpactSpreadsheet](https://discmaster.textfiles.com/search?format=fullImpactSpreadsheet) | Full Impact spreadsheet |  | 
 [document/geoWorksGeoCalcSpreadsheet](https://discmaster.textfiles.com/search?format=geoWorksGeoCalcSpreadsheet) | GeoWorks GeoCalc spreadsheet | .000 | 
-[document/geoWorksGEOSHelp](https://discmaster.textfiles.com/search?format=geoWorksGEOSHelp) | GeoWorks GEOS help | .000 | 
-[document/geoWorksWriterDocument](https://discmaster.textfiles.com/search?format=geoWorksWriterDocument) | GeoWorks Writer document | .000 | 
 [document/gfxbootCompiledHTMLHelp](https://discmaster.textfiles.com/search?format=gfxbootCompiledHTMLHelp) | gfxboot compiled HTML Help | .hlp | 
 [document/greatkarteiDataBase](https://discmaster.textfiles.com/search?format=greatkarteiDataBase) | Greatkartei data base | .great .geaendert | 
 [document/greenstreetPublisher](https://discmaster.textfiles.com/search?format=greenstreetPublisher) | [Greenstreet Publisher Document/Snippet](http://fileformats.archiveteam.org/wiki/Greenstreet_Publisher) | .dtp .srp | [10 sample files](https://sembiance.com/fileFormatSamples/document/greenstreetPublisher/) - Some of these opened in Win2k with Publishing Suite 99, but it can't save in ANY other format, maybe I could 'print' to a PDF or something. But not all worked and not too many files out there, so not supported for now.
@@ -536,7 +534,7 @@ Family/Format | Name | Extensions | Notes
 
 
 
-## Executable (60)
+## Executable (59)
 Family/Format | Name | Extensions | Notes
 ------------- | ---- | ---------- | -----
 [executable/aDotOutExecutable](https://discmaster.textfiles.com/search?format=aDotOutExecutable) | a.out Executable | .o | 
@@ -555,7 +553,6 @@ Family/Format | Name | Extensions | Notes
 [executable/digiPAKAudioDriver](https://discmaster.textfiles.com/search?format=digiPAKAudioDriver) | DIGIPAK audio driver | .com | 
 [executable/elf](https://discmaster.textfiles.com/search?format=elf) | ELF Executable/Library |  | [1 sample file](https://sembiance.com/fileFormatSamples/executable/elf/)
 [executable/fmTownsOSApp](https://discmaster.textfiles.com/search?format=fmTownsOSApp) | FM-TownsOS App | .exp | [9 sample files](https://sembiance.com/fileFormatSamples/executable/fmTownsOSApp/)
-[executable/geoWorksGEOSApplication](https://discmaster.textfiles.com/search?format=geoWorksGEOSApplication) | GeoWorks GEOS application | .geo | 
 [executable/hpPalmtopExecutable](https://discmaster.textfiles.com/search?format=hpPalmtopExecutable) | HP Palmtop Executable | .exm | [2 sample files](https://sembiance.com/fileFormatSamples/executable/hpPalmtopExecutable/)
 [executable/linux8086Exe](https://discmaster.textfiles.com/search?format=linux8086Exe) | Linux 8086 Executable |  | 
 [executable/linux386Exe](https://discmaster.textfiles.com/search?format=linux386Exe) | Linux i386 Executable |  | 
@@ -729,7 +726,7 @@ Family/Format | Name | Extensions | Notes
 
 
 
-## Image (188)
+## Image (187)
 Family/Format | Name | Extensions | Notes
 ------------- | ---- | ---------- | -----
 [image/threeDStudio2DShape](https://discmaster.textfiles.com/search?format=threeDStudio2DShape) | 3D Studio 2D Shape | .shp | 
@@ -804,7 +801,6 @@ Family/Format | Name | Extensions | Notes
 [image/genericCADD](https://discmaster.textfiles.com/search?format=genericCADD) | Generic CADD | .gcd | 
 [image/genuineFractalsSTINGImage](https://discmaster.textfiles.com/search?format=genuineFractalsSTINGImage) | Genuine Fractals STING image | .stn | 
 [image/geoWorksGeoDrawDrawing](https://discmaster.textfiles.com/search?format=geoWorksGeoDrawDrawing) | GeoWorks GeoDraw drawing | .000 | 
-[image/geoWorksGEOSBackground](https://discmaster.textfiles.com/search?format=geoWorksGEOSBackground) | GeoWorks GEOS background | .000 .geo | 
 [image/godotBitmapsContainer](https://discmaster.textfiles.com/search?format=godotBitmapsContainer) | Godot bitmaps container | .stex | 
 [image/graphicWorksVectorDrawing](https://discmaster.textfiles.com/search?format=graphicWorksVectorDrawing) | GraphicWorks Vector Drawing | .dvg | 
 [image/greenstreetDrawing](https://discmaster.textfiles.com/search?format=greenstreetDrawing) | Greenstreet Drawing | .art | [6 sample files](https://sembiance.com/fileFormatSamples/image/greenstreetDrawing/)
@@ -1096,7 +1092,7 @@ Family/Format | Name | Extensions | Notes
 
 
 
-## Other (2,767)
+## Other (2,769)
 Family/Format | Name | Extensions | Notes
 ------------- | ---- | ---------- | -----
 [other/dotNETPortablePDB](https://discmaster.textfiles.com/search?format=dotNETPortablePDB) | .NET portable PDB | .pdb | 
@@ -3645,10 +3641,12 @@ Family/Format | Name | Extensions | Notes
 [other/vikingEmbroideryDataDisk](https://discmaster.textfiles.com/search?format=vikingEmbroideryDataDisk) | Viking embroidery data disk | .shv .mhv .phv | 
 [other/virToolsFiles](https://discmaster.textfiles.com/search?format=virToolsFiles) | Virtools files | .cmo .nmo .vmo .nms | 
 [other/virtualChess2Game](https://discmaster.textfiles.com/search?format=virtualChess2Game) | Virtual Chess 2 game | .eck | 
+[other/virtualDreamsGameDataContainer](https://discmaster.textfiles.com/search?format=virtualDreamsGameDataContainer) | Virtual Dreams game data container |  | 
 [other/virtualFireScene](https://discmaster.textfiles.com/search?format=virtualFireScene) | Virtual Fire Scene | .sce | 
 [other/virtualGameStationMemoryCardSaveGame](https://discmaster.textfiles.com/search?format=virtualGameStationMemoryCardSaveGame) | Virtual Game Station memory card save game |  | 
 [other/virtualPascalUnit](https://discmaster.textfiles.com/search?format=virtualPascalUnit) | Virtual Pascal Unit | .vpi | 
 [other/virtualSkipperGameData](https://discmaster.textfiles.com/search?format=virtualSkipperGameData) | Virtual Skipper game data | .vsk .pak | 
+[other/virtualTheatreSystemData](https://discmaster.textfiles.com/search?format=virtualTheatreSystemData) | Virtual Theatre System data |  | 
 [other/virtualTIEmulatorSkin](https://discmaster.textfiles.com/search?format=virtualTIEmulatorSkin) | Virtual TI emulator skin | .skn | 
 [other/virtualVillagersData](https://discmaster.textfiles.com/search?format=virtualVillagersData) | Virtual Villagers data | .ldw | 
 [other/virtualBusMap](https://discmaster.textfiles.com/search?format=virtualBusMap) | VirtualBus Map | .ms1 | 

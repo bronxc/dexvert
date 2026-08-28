@@ -28,48 +28,8 @@
 | Vibe Viable |
 \-------------/
 >>> wip
-* Use selectiveReprocess with: dra selectiveReprocess.js --reset --agent=installerFinder "https://discmaster.textfiles.com/search?q=setup.exe&format=exe&dedup=dedup"
-  Then tar/gz it on discmaster2, copy it down to Assorted and vibe-init for: setupSpecialist
-  See: test/sample/executable/exe/SeTUp.eXe
 
-* image/fractalImageFormat
-
-* See if I can find sandbox/wip/encarta.png in: https://discmaster.textfiles.com/admin/item?itemid=46485
-	https://discmaster.textfiles.com/search?q=%E2%80%9C98-028.txt%E2%80%9D&qfields=name&qfields=t
-  If not, look at the encarta files and see about vibe coding an extractor
 <<<
-
-* imtools including support for --list-formats
-	ImTools/LibIm aka imconv (old unix code that doesn't compile on modern linux, sadly)  https://github.com/hkaiser/TRiAS/tree/master/Kartenverarbeitung/Imtools
-		bmp    Microsoft Windows bitmap image file
-		cur    Microsoft Windows cursor image file
-		eps    Adobe Encapsulated PostScript file
-		gif    Compuserve Graphics image file
-		hdf    Hierarchical Data File
-		ico    Microsoft Windows icon image file
-		icon   Sun Icon and Cursor file
-		iff    Sun TAAC Image File Format
-		jpeg   JPEG image file format
-		miff   ImageMagick's image file format
-		mpnt   Apple Macintosh MacPaint file
-		pbm    PBM Portable Bit, Gray, and Pixel Map files
-		pcx    ZSoft IBM PC Paintbrush file
-		pic    PIXAR picture file
-		pict   Apple Macintosh QuickDraw/PICT file
-		pix    Alias image file
-		ps     Adobe PostScript file
-		ras    Sun Rasterfile
-		rgb    SGI RGB image file
-		rla    Wavefront raster image file
-		rle    Utah Run length encoded image file
-		synu   SDSC Synu image file
-		tga    Truevision Targa image file
-		tiff   Tagged image file
-		viff   Khoros Visualization image file
-		x      AVS X image file
-		xbm    X11 bitmap file
-		xpm    X11 pixmap file
-		xwd    X Window System window dump image file
 
 * video/grasp some don't convert anymore like l&hardy.gl and v7vga.gl
 
@@ -120,9 +80,9 @@
 	- Microsoft Access databases
 	- document/clarianDatabase
     - Look for other "database" in simple.js or unsupported.js files to add support for converting
-* Add 'proper' AskSam support for the ~460 files: https://discmaster.textfiles.com/search?format=askSamDatabase
-  https://preservation.tylerthorsted.com/2024/01/26/asksam/
-  Right now I just have it as a 'simple' file using strings, of which I already have some samples for
+	- Add 'proper' AskSam support for the ~460 files: https://discmaster.textfiles.com/search?format=askSamDatabase
+  	  https://preservation.tylerthorsted.com/2024/01/26/asksam/
+  	  Right now I just have it as a 'simple' file using strings, of which I already have some samples for
 
 * The output files from allegroPackfile could be further converted and improved based on data: https://liballeg.org/stabledocs/en/datafile.html
   After reprocess: https://discmaster.textfiles.com/search?format=allegroPackfile

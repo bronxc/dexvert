@@ -1,0 +1,572 @@
+PC/GEOS 2.x COMPILED HELP FILE FORMAT
+=====================================
+
+Scope
+-----
+
+This document specifies the byte-level format of a PC/GEOS 2.x compiled Help
+database using Help protocol 2.0.  It covers the GEOS common header, VM file,
+Database Manager objects, local-memory blocks, shared text attribute arrays,
+saved VisText contexts, PKWARE DCL compression, graphics HugeArrays, GString
+elements, and complex bitmaps.
+
+All multibyte integers are little-endian.  A "word" is 16 bits, a "dword" is
+32 bits, and a "sword" is a signed 16-bit value.  File offsets below are
+absolute unless a structure says otherwise.  VM handles and LMem chunk handles
+are even 16-bit offsets into their respective handle tables.  A DB item is the
+pair (group VM handle, DBItemInfo offset).
+
+File overview
+-------------
+
+  0000-00ff  256-byte GeosFileHeader
+  0100-0117  24-byte fixed VMFileHeader
+  0118-...   packed VM blocks and assigned-free extents
+
+The VM header itself is one of those blocks.  It describes every extent after
+the fixed VMFileHeader.  There are no anonymous bytes between extents and no
+trailer.  Padding inside an allocated VM or LMem extent is allocator slack; it
+has no document meaning but remains owned by that allocation.
+
+GEOS common file header (256 bytes)
+-----------------------------------
+
+  Offset  Size  Field
+  0000      4   signature: c7 45 c1 53 (high-bit "GEAS")
+  0004     36   FileLongName, NUL-padded GEOS SBCS
+  0028      2   GeosFileType; 2 means VM file
+  002a      2   GeosFileHeaderFlags
+  002c      8   ReleaseNumber: four words
+  0034      4   ProtocolNumber: major word, minor word
+  0038      6   GeodeToken: four characters plus manufacturer word;
+                   compiled Help uses 68 6c 70 66 00 00 ("hlpf", 0)
+  003e      6   creator token; compiled Help uses
+                   68 6c 70 76 00 00 ("hlpv", 0)
+  0044    100   FileUserNotes
+  00a8     32   FileCopyrightNotice
+  00c8      2   creation FileDate
+  00ca      2   creation FileTime
+  00cc      8   FilePassword
+  00d4     16   FileDesktopInfo
+  00e4     28   reserved for the common-header implementation
+
+FileDate packs year-1980 in bits 15..9, month in 8..5, and day in 4..0.
+FileTime packs hour in bits 15..11, minute in 10..5, and seconds/2 in 4..0.
+The notes, notice, password, desktop information, and reserved bytes are common
+GEOS metadata, not Help payload.
+
+VM file
+-------
+
+The 24-byte fixed header begins at 0100:
+
+  +00 word   0xadeb, VM file signature
+  +02 word   allocated size of the VM header block
+  +04 dword  VM-header position relative to 0100
+  +08 word   update counter
+  +0a word   update type
+  +0c 12     reserved/runtime VM fields
+
+At the relative position is the variable-sized VMHeader:
+
+  +00 word   0x00fb
+  +02 word   first assigned-free handle
+  +04 word   last assigned-free handle
+  +06 word   first unassigned handle
+  +08 word   last handle-table byte offset
+  +0a sword  number of assigned-free records
+  +0c sword  number of unassigned records
+  +0e sword  number of used records
+  +10 sword  number of resident records (a runtime/cache count)
+  +12 sword  fifth VM bookkeeping count
+  +14 word   ordinary VM map handle; zero in this format
+  +16 sword  compaction threshold
+  +18 dword  sum of the allocated sizes of all used blocks
+  +1c byte   VM attributes
+  +1d byte   VM compression flags
+  +1e word   Database Manager map VM handle
+  +20 ...    twelve-byte VMBlockHandle records
+
+The handle value of a record is its byte offset in VMHeader: 0x20, 0x2c,
+0x38, and so on.  The record at handle 0x20 describes VMHeader itself.  Its
+administrative user ID is normally 0xadeb; the legacy ID 0x8000 has the same
+meaning for this record.
+
+A used record has:
+
+  +00 word   transient memory handle (normally zero on disk)
+  +02 byte   used signature, 0xfe or 0xff
+  +03 byte   VM block flags
+  +04 word   VM user ID
+  +06 word   allocated block size
+  +08 dword  position relative to 0100
+
+An unused record has:
+
+  +00 word   next free handle
+  +02 word   previous assigned-free handle (zero for unassigned handles)
+  +04 dword  allocated size; zero means an unassigned handle
+  +08 dword  position relative to 0100; meaningful for assigned extents
+
+Assigned-free records form the doubly-linked first/last-assigned list.
+Unassigned records form the singly-linked first-unassigned list.  Counts,
+chains, extent boundaries, and the used-size sum must agree.  Every allocated
+extent starts exactly where the previous one ends.  VM user IDs used here are:
+
+  0000  top-level Help ElementArray block
+  ff00  DB map
+  ff01  DB group
+  ff02  DB item block
+  ff03  HugeArray directory
+  ff04  HugeArray data block
+  adeb or 8000  VM header's own record
+
+Local-memory (LMem) blocks
+--------------------------
+
+The common 16-byte LMemBlockHeader is:
+
+  +00 word   on-disk/self VM handle
+  +02 word   byte offset of the LMem handle table
+  +04 word   LMem flags; 0x0100 is LMF_IS_VM, 0x0200 is NO_HANDLES
+  +06 word   LMem block type; zero is the general heap type
+  +08 word   logical block size
+  +0a word   number of two-byte handles
+  +0c word   first free chunk's payload pointer, or zero
+  +0e word   total allocated bytes on the free-chunk chain
+
+Each handle contains zero, 0xffff, or a pointer to a live chunk payload.  The
+word immediately before a live or free payload is its stored size, including
+that size word.  The allocation is round_up_4(stored_size).  A free payload
+begins with the next-free pointer.  Free chunks ascend by address.  The handle
+table followed by live and free allocations exactly covers the logical size.
+Bytes between logical size and VM allocated size are LMem allocator slack.
+
+DB item blocks use a 20-byte variant: the common header is followed by the
+block's VM handle at +10 and its DBItemBlockInfo offset at +12.  (Those offsets
+are hexadecimal.)  Their LMF_IS_VM bit is not reliable, so their VM user ID,
+self handle, and DB backlink are the authoritative identity.
+
+Database Manager layer
+----------------------
+
+The VM header's DB-map handle identifies a UID ff00 block.  Its first 12 bytes:
+
+  +00 word   self VM handle
+  +02 word   runtime memory handle
+  +04 word   group handle of the HelpFileMapBlock DB item
+  +06 word   item offset of the HelpFileMapBlock DB item
+  +08 word   legacy ungrouped DB group handle
+  +0a word   new-allocator ungrouped DB group handle
+
+Remaining allocated bytes are DB allocator state/slack.
+
+A UID ff01 DB group begins:
+
+  +00 word   self VM handle
+  +02 word   runtime memory handle
+  +04 word   DBGroupFlags
+  +06 word   first active DBItemBlockInfo offset
+  +08 word   first free DBItemInfo offset
+  +0a word   first free DBItemBlockInfo offset
+  +0c word   logical group size
+  +0e word   item count when GF_NEW_UNGROUP (0x4000) is set
+
+If GF_NEW_UNGROUP is clear, this is the legacy 14-byte header and +0e is
+already the first heap word.  If it is set, the heap begins at +10 hex.  Bits
+below 0x2000 in DBGroupFlags are undefined for this structure.
+
+An active DBItemBlockInfo is six bytes:
+
+  +00 word   next active DBItemBlockInfo offset
+  +02 word   UID ff02 DB item-block VM handle
+  +04 sword  number of DB items in that block
+
+A DBItemInfo is four bytes: DBItemBlockInfo offset, then LMem chunk handle.
+A free DBItemInfo is four bytes headed by its next-free offset.  A free
+DBItemBlockInfo is six bytes headed by its next-free offset.  All offsets are
+even and relative to the group.  Every live chunk in every UID ff02 block has
+exactly one active DBItemInfo, every block has one active block-info record,
+and its reference count equals its live chunk count.
+
+HelpFileMapBlock (DB map item)
+------------------------------
+
+The Help map DB item is exactly 51 bytes:
+
+  +00 word   protocol major = 2
+  +02 word   protocol minor = 0
+  +04 word   HelpFileFlags
+  +06 byte   HelpCompressType: 0 none, 1 Tang/Fults, 2 PKWARE DCL
+  +07 word   compression dictionary VM handle
+  +09 word   names VM handle
+  +0b word   character-attribute VM handle
+  +0d word   paragraph-attribute VM handle
+  +0f word   type-attribute VM handle
+  +11 word   graphic-attribute VM handle, or zero
+  +13 32     reserved
+
+HelpFileFlags is a high-bit-first record: 0x8000 means created by Studio and
+0x4000 means Help rather than Content.  The remaining bits are reserved.
+Protocol-2 DCL pages use no external dictionary, so dictionary is zero.  The
+five array handles are UID 0000 VM blocks containing one LMem chunk.  The
+reserved bytes are zero.
+
+ChunkArray and ElementArray
+---------------------------
+
+A ChunkArrayHeader is eight bytes:
+
+  +00 word   element count
+  +02 word   fixed element size; zero means variable-sized
+  +04 word   transient enumeration cursor; zero on disk
+  +06 word   data offset
+
+For a fixed array, count adjacent elements begin at data offset.  For a
+variable array, count word offsets begin there; each is relative to the start
+of the ChunkArray and the payloads extend from one offset to the next/end.
+Offsets ascend.
+
+ElementArrayHeader appends +08 word free-element token, with 0xffff as the
+terminator.  TextElementArrayHeader appends +0a byte type and +0b reserved.
+NameArrayHeader instead appends +0a word data size.
+
+Every ElementArray element begins with a three-byte WordAndAHalf reference
+count.  An element is free when byte +02 is 0xff; its first word is the next
+free token.  Variable elements may shrink to only these three bytes.  Fixed
+elements retain their complete fixed slot while free.  The free list must name
+every free element exactly once.
+
+Name array
+----------
+
+The names array is variable, has a 12-byte NameArrayHeader, and dataSize=16.
+An active element is:
+
+  +00 3      reference count (WordAndAHalf)
+  +03 byte   VisTextNameType: 0 context, 1 external file
+  +04 byte   VisTextContextType: 0 text, 1 category, 2 question,
+                 3 answer, 4 definition, 0xff external file
+  +05 word   external-file name token, or 0xffff for the current file
+  +07 word   DB item offset containing context text
+  +09 word   DB group handle containing context text
+  +0b 8      Help extension
+  +13 ...    un-terminated GEOS SBCS name, ending at the element boundary
+
+For ordinary Help files the extension is reserved and zero.  A Studio Content
+file interprets it as four words: next-page token, previous-page token, up-page
+token, and one-based real page number.  Contexts with a nonzero group/item pair
+identify saved VisText DB items.  More than one name may identify the same DB
+item.  An allocated page without a name is still a valid anonymous context.
+
+Shared text attribute arrays
+----------------------------
+
+Character attributes use TextElementArray type 0 and fixed elements of 38
+bytes.  VisTextCharAttr is:
+
+  +00 3      reference count
+  +03 word   style token
+  +05 word   FontID
+  +07 3      WBFixed point size: fractional byte, integer word
+  +0a byte   TextStyle bits (outline 40, bold 20, italic 10,
+                 superscript 08, subscript 04, strike 02, underline 01)
+  +0b 4      foreground ColorQuad
+  +0f sword  track kerning
+  +11 byte   font weight
+  +12 byte   font width
+  +13 word   VisTextExtendedStyles
+  +15 byte   foreground SystemDrawMask
+  +16 2      foreground GraphicPattern
+  +18 4      background ColorQuad
+  +1c byte   background SystemDrawMask
+  +1d 2      background GraphicPattern
+  +1f 7      reserved, zero
+
+VisTextExtendedStyles uses bits 8000 boxed, 4000 button, 2000 index, 1000 all
+caps, 0800 small caps, 0400 hidden, 0200 change bar, 0100 background color,
+and 0080 no-wrap.
+
+Paragraph attributes use a variable ElementArray with 12-byte header.  The
+fixed portion is 72 bytes and is followed by numberOfTabs eight-byte Tabs:
+
+  +00 5      StyleSheetElementHeader (reference count, style token)
+  +05 word   VisTextParaBorderFlags
+  +07 4      border ColorQuad
+  +0b word   VisTextParaAttrAttributes
+  +0d word   left margin, units 1/8 point
+  +0f word   right-edge inset, units 1/8 point
+  +11 word   first-line/paragraph margin, units 1/8 point
+  +13 2      unsigned BBFixed line-spacing multiplier (8.8)
+  +15 word   leading, units 1/8 point
+  +17 word   space above, units 1/8 point
+  +19 word   space below, units 1/8 point
+  +1b 4      background ColorQuad
+  +1f byte   number of Tabs
+  +20 byte   border width, units 1/8 pixel
+  +21 byte   border spacing, units 1/8 pixel
+  +22 byte   border shadow, units 1/8 pixel
+  +23 byte   border SystemDrawMask
+  +24 byte   background SystemDrawMask
+  +25 2      border GraphicPattern
+  +27 2      background GraphicPattern
+  +29 word   default-tab interval, units 1/8 point
+  +2b word   starting paragraph number
+  +2d 4      paragraph-number prefix characters
+  +31 word   VisTextHyphenationInfo
+  +33 byte   VisTextKeepInfo
+  +34 word   VisTextDropCapInfo
+  +36 word   next style token
+  +38 byte   StandardLanguage
+  +39 15     reserved, zero
+  +48 ...    Tabs
+
+The high two attribute bits select left/right/center/full justification
+(0/1/2/3).  The following bits are keep-with-next 2000, keep-together 1000,
+auto-hyphenate 0800, disable-wrap 0400, column-break-before 0200; bits 0100,
+0080,0040 encode VisTextNumberType; 0020 is drop-cap and 0010 keep-lines.
+A Tab is position word (1/8 point), attributes byte (leader bits 4..2 and tab
+type bits 1..0), gray mask byte, line width byte, line spacing byte, and anchor
+character word.
+
+Type attributes use TextElementArray type 3 and fixed ten-byte VisTextType:
+
+  +00 3      reference count
+  +03 word   hyperlink context-name token, or 0xffff
+  +05 word   hyperlink external-file-name token, or 0xffff
+  +07 word   context name token, or 0xffff
+  +09 byte   zero
+
+An old writer may link a fixed Type element as free while a text run still
+references its intact ten-byte slot.  The fixed bytes remain the run's value;
+the free-list marker describes allocator status, not an erased body.
+
+Graphic attributes use TextElementArray type 2 and fixed 50-byte elements:
+
+  +00 3      reference count
+  +03 dword  VM chain: low word zero and high word HugeArray handle for GString
+  +07 word   graphic width in points (zero means dynamic)
+  +09 word   graphic height in points (zero means dynamic)
+  +0b byte   type: 0 GString, 1 variable
+  +0c word   flags: 8000 draw-from-baseline, 4000 handles-pointer,
+                 2000 hot-spot; remaining bits reserved
+  +0e 4      reserved
+  +12 32     type-specific data
+
+For a GString, the 32 bytes are a 26-byte TransMatrix followed by a signed
+XYOffset.  A TransMatrix is four 16.16 values (fraction word then signed
+integer word) followed by two 32.16 translations (fraction word then signed
+dword).  For a variable graphic the data begins with manufacturer word, type
+word, and 28 private bytes.  Variable types 0..5 are page/section counts with
+a VisTextNumberType; 6 creation date/time, 7 modification date/time, 8 current
+date/time, 9 stored date/time; 10 context page, 11 context page in section,
+12 context section, 13 context name, and 14 hotspot.  Their private words are
+the DateTimeFormat, number format, context token, or hotspot offsets/token as
+appropriate.
+
+ColorQuad and masks
+-------------------
+
+ColorQuad is four bytes.  Byte +1 is ColorFlag.  For 00, byte +0 is a 256-color
+palette index.  For 01 it is an 8-bit gray.  For 03 the bytes +0,+2,+3 are CMY
+and RGB is their complement.  For 80 those bytes are direct RGB.
+
+The first 16 default palette entries are the DOS/EGA colors.  Entries 16..31
+are gray 00,11,...,ff.  Entries 32..39 are black.  Entries 40..255 enumerate
+RGB levels 00,33,66,99,cc,ff with blue varying fastest.
+
+SystemDrawMask 0..9 selects named 8x8 patterns.  Values 25..89 select the 65
+ordered coverage masks: 25 is 100%, 33 is 87.5%, ..., 81 is 12.5%, 89 is 0%.
+Every intervening value is a distinct one-bit coverage step.  Value 7f means a
+custom mask.  Bit 80 requests the inverse.
+
+Saved VisText context DB item
+-----------------------------
+
+With HelpCompressType 0, the DB item directly contains the saved page.  With
+type 2, it begins with a word giving the exact uncompressed size followed by
+one complete PKWARE DCL implode stream.  Type 1 and nonzero dictionary handles
+belong to a different encoding profile.
+
+The uncompressed page is:
+
+  +00 word   VisTextSaveDBFlags, normally 0xd500
+  then five repetitions of:
+       word byteLength
+       byte[byteLength] chunk
+
+The chunks, in order, are text, character runs, paragraph runs, type runs, and
+graphic runs.  0xd500 means text present and VTST_RUNS_ONLY (value 2) for all
+four run classes.  Styles, regions, and a per-page name array are absent
+because all elements/names are shared at file scope.
+
+The text chunk is GEOS SBCS followed by one NUL not included in run positions.
+Important controls are 09 tab, 0b section break, 0c page/column break, 0d
+paragraph break, 19 zero-width character, 1a embedded graphic, 1b thin space,
+1c en space, 1d em space, 1e nonbreaking hyphen, and 1f optional hyphen.  Bytes
+20..ff use the GEOS SBCS repertoire, whose printable upper half is Mac Roman.
+
+Each run chunk is a fixed-size ChunkArray with a 12-byte TextRunArrayHeader:
+
+  +00 word   run count
+  +02 word   element size = 5
+  +04 word   transient cursor = 0
+  +06 word   data offset = 12
+  +08 word   corresponding shared ElementArray VM handle
+  +0a word   transient/runtime ElementArray reference
+
+Each run is a three-byte unsigned text position and a two-byte element token.
+The final run is always position ffffff/token ffff.  Ordinary changes ascend,
+but serialized mutation fragments may be appended out of positional order;
+apply entries in storage order, with each later entry replacing the token from
+its start position onward.  A graphic run is point data: its start must be the
+position of a 1a C_GRAPHIC, and every C_GRAPHIC has exactly one effective
+graphic run.
+
+PKWARE DCL implode stream
+-------------------------
+
+Bits are consumed least-significant bit first.  The first byte is literal mode
+(0 raw 8-bit literals, 1 coded literals); the second is dictionary-bit count
+4, 5, or 6.  Each item starts with one bit: zero is a literal, one is a
+length/distance copy.  Huffman decoding uses inverted incoming bits and
+canonical codes.  A packed table byte contributes (high nibble + 1) symbols
+whose code length is the low nibble.
+
+Static packed code-length tables are:
+
+  literal:
+    11 124 8 7 28 7 188 13 76 4 10 8 12 10 12 10 8 23 8 9 7 6 7 8
+    7 6 55 8 23 24 12 11 7 9 11 12 6 7 22 5 7 24 6 11 9 6 7 22 7 11
+    38 7 9 8 25 11 8 11 9 12 8 12 5 38 5 38 5 11 7 5 6 21 6 10 53
+    8 7 24 10 27 44 253 253 253 252 252 252 13 12 45 12 45 12 61 12
+    45 44 173
+  length:   2 35 36 53 38 23
+  distance: 2 20 53 230 247 151 248
+
+Length symbol bases are [3,2,4,5,6,7,8,9,10,12,16,24,40,72,136,264], with
+extra-bit counts [0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8].  A resulting length 519
+is the end marker.  Otherwise distance is:
+
+  (decoded_distance_symbol << n) + next_n_bits + 1
+
+where n=2 for length 2 and otherwise n=dictionary-bit count.  Copying is the
+usual overlapping backward copy.  The end marker must be in the final source
+byte and all unused high padding bits must be zero.
+
+GString HugeArray
+-----------------
+
+A graphic's high VM-chain word identifies a UID ff03 HugeArrayDirectory.  It
+has a 26-byte header: the normal 16-byte LMem header, then first data-block
+handle, directory ChunkArray handle, extended-directory handle (zero), self VM
+handle, and fixed element size (zero for variable GString elements).  Alignment
+may place two bytes before its LMem handle table.
+
+Its sole chunk is a fixed ChunkArray of eight-byte HugeArrayDirectoryEntry
+records.  Entry zero is the sentinel (last element ffffffff, size 0, handle 0).
+Further entries contain last element index (dword), used logical byte count
+(word), and UID ff04 data-block handle (word).
+
+A data block has the normal 16-byte LMem header followed by next-block,
+previous-block, and parent-directory handles.  The first previous handle is
+zero; early writers also use the directory handle there.  Later backlinks and
+all forward links must form the directory order.  Alignment brings the LMem
+handle table to +18 hex.  Its sole chunk is a variable ChunkArray whose element
+count agrees with the directory's inclusive last-index ranges.  Each variable
+element is one complete GString command.
+
+GString command encoding
+------------------------
+
+The first byte is GStringElement opcode.  Fixed total sizes (including opcode)
+are:
+
+  00:1 02:1 03:9 0d:3 0f:2
+  10:5 11:9 12:9 13:29 14:9 15:29 16:1 17:1 18:1 19:1 1a:1
+  20:9 21:5 22:9 23:7 24:3 25:7 26:3 28:14 29:27 2a:19 2b:19
+  2c:9 2d:5 2e:11 2f:7 32:17 33:13 34:13 35:9 37:5 38:1
+  3a:6 3b:2 3f:7 40:9 41:1 42:9 43:5 44:11 45:7 46:14
+  48:9 49:2 4a:27 4b:19 4e:9 4f:7 52:9 53:7
+  60:1 61:1 62:2 63:5 64:9 65:1 66:1 67:6 69:4 6a:2 6b:2
+  6c:5 6d:2 6e:2 6f:14 70:5 71:3 72:2 73:9 75:4 76:2
+  77:2 78:7 79:2 7a:9 7b:3 7d:4 7e:2 7f:2 80:3 81:3
+  82:4 83:25 84:6 85:2 86:9 87:3 88:2 89:2 8a:3 8b:3
+  8c:3 8e:9 8f:2 a0:5 a1:1 a2:11 a3:11 a4:1 a5:4 a6:4 a7:1
+
+Variable commands are:
+
+  01 comment: word byte count at +1, then bytes
+  0e escape: word escape code, word byte count at +3, then bytes
+  27/30/31/36: word coordinate count, then count signed XY pairs
+  39 brush polyline: count at +1, brush dimensions at +3,+4, XY pairs at +5
+  3c draw text: XY at +1, byte count +5, SBCS at +7
+  3d draw text at current point: byte count +1, SBCS at +3
+  3e text field: total chars +1; saved field header through +14; repeated
+       word runCharCount, 24-byte TextAttr, and runCharCount SBCS bytes
+  47 fill polygon: count +1, fill rule +3, XY pairs +4
+  4c/50 positioned bitmap: XY +1, bitmap byte count +5, CBitmap +7
+  4d/51/54 current-point bitmap or slice: count +1, CBitmap +3
+  68 custom palette: word entry count +2, then three RGB bytes per entry
+  74 custom line style: word pair count +3, then that many word pairs
+  7c/8d custom area/text pattern: byte count +3, then pattern bytes
+
+Opcode groups follow the PC/GEOS graphics API: 00 end; 01 comment; 02 null;
+03 bounds; 0d label; 0e escape; 0f new page; 10..1a transforms; 20..3e
+line/arc/shape/curve/text drawing; 41..54 path fill, filled shapes, and bitmaps;
+60..68 state/mix/current point/palette; 69..74 line attributes; 75..7c area
+attributes; 7d..8f text attributes; and a0..a7 paths and clipping.  Undefined
+holes are not legal serialized commands.  3f,40,4e,4f,52,53 are pointer/optr
+forms and are not portable on-disk drawing data.  The final HugeArray element
+is opcode 00 and no element follows it.
+
+Complex bitmap in a GString
+---------------------------
+
+A serialized bitmap is a 20-byte CBitmap:
+
+  +00 word   width pixels
+  +02 word   height pixels
+  +04 byte   compaction: 0 raw, 1 PackBits
+  +05 byte   BMType
+  +06 word   first scan line in this slice
+  +08 word   scan-line count
+  +0a word   device-info offset/transient field
+  +0c word   pixel-data offset from CBitmap start
+  +0e word   palette offset from CBitmap start
+  +10 word   horizontal DPI
+  +12 word   vertical DPI
+
+BMType bits are 40 palette present, 20 HugeArray, 10 per-pixel mask, 08 complex,
+and low three-bit format: 0 one-bit monochrome, 1 four-bit indexed, 2 eight-bit
+indexed.  A serialized Help GString CBitmap is complex.  If a palette exists,
+the palette location begins with entry count 2, 16, or 256 followed by RGB
+triples.  Without one, the standard 256-color GEOS palette applies.
+
+Rows contain an optional ceil(width/8)-byte opacity mask, then pixels:
+ceil(width/8) bytes for mono, ceil(width/2) for four-bit, or width for eight-bit.
+Bits/nibbles are most-significant first.  With compaction 0 rows are adjacent.
+With compaction 1 each row independently expands to its exact row size.  A
+signed control >=0 copies control+1 literal bytes; a negative control repeats
+the following byte 1-control times.  No compressed bytes follow the final row.
+
+A bitmap command may be followed by opcode-54 slices.  All slices have equal
+dimensions, resolution, mask presence, and pixel format; scan ranges neither
+overlap nor leave gaps.  A sequence can start with a descriptor whose scan
+count is zero and start scan is zero.  It can be exactly the 20-byte header or
+also carry the common palette; in the latter case data offset points to the end
+of the descriptor.  Actual following slices cover every scan line.
+
+Validation and byte ownership
+-----------------------------
+
+A conforming reader should reject before producing output if signatures,
+protocol, defined flag bits, counts, linked lists, self handles, VM user IDs,
+allocation boundaries, chunk sizes, element free lists, DB backlinks, page
+lengths, run references, DCL terminator/padding, HugeArray indices/links,
+GString element sizes, bitmap offsets, palettes, or scan coverage disagree.
+
+Every byte belongs to exactly one of: a defined field, text/string/command or
+bitmap payload, reserved common-format storage, a free allocator record, or
+allocator slack inside a declared allocation.  Reserved storage and allocator
+slack must not be reinterpreted as Help content.
