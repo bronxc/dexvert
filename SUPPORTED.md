@@ -1,11 +1,11 @@
-# Supported File Formats (3,842)
+# Supported File Formats (3,843)
 Converters are in priority order. That is, early converter entries handle the format better than later converters.
 
 Extensions are in order of importance, with the format's primary extension appearing first.
 
 
 
-## Archive (695)
+## Archive (694)
 Family | Name | Extensions | Converters | Notes
 ------ | ---- | ---------- | ---------- | -----
 archive | 0000 Package Archive | .0000 | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [1 sample file](https://sembiance.com/fileFormatSamples/archive/package0000Archive/)
@@ -274,7 +274,7 @@ archive | [Hamarsoft HAP Archive](http://fileformats.archiveteam.org/wiki/HAP) |
 archive | [Hammer](http://fileformats.archiveteam.org/wiki/Hammer_(compression)) | .hmr | [hammer_decomp](https://github.com/Treeki/RandomStuff/blob/master/hammer_decomp.py) | [10 sample files](https://sembiance.com/fileFormatSamples/archive/hammer/)
 archive | Harry Potter: Quidditch World Cup archive | .ccd | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [10 sample files](https://sembiance.com/fileFormatSamples/archive/harryPotterQuidditchWorldCupArchive/)
 archive | HE2 TLKB Archive | .he2 .he4 | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [1 sample file](https://sembiance.com/fileFormatSamples/archive/he2TLKB/)
-archive | Hell: A Cayberpunk Thriller Library | .pl | [na_game_tool_extract](https://nihav.org/game_tool.html) | [6 sample files](https://sembiance.com/fileFormatSamples/archive/hellLib/)
+archive | Hell: A Cayberpunk Thriller Library | .pl | [na_game_tool_extract](https://nihav.org/game_tool.html) | [8 sample files](https://sembiance.com/fileFormatSamples/archive/hellLib/)
 archive | [Hemera Thumbnails Archive](http://fileformats.archiveteam.org/wiki/HTA_(Hemera)) | .hta | [deark](https://entropymine.com/deark/) [nconvert](https://www.xnview.com/en/nconvert/) | [5 sample files](https://sembiance.com/fileFormatSamples/archive/hemeraThumbnailsArchive/)
 archive | Heroes of Might & Magic AGG2 archive | .vol | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [1 sample file](https://sembiance.com/fileFormatSamples/archive/hommAGG2/)
 archive | HHA Archive | .hha | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/hhaArchive/)
@@ -576,8 +576,7 @@ archive | [Softdisk LIBrary Game Data Archive](https://moddingwiki.shikadi.net/w
 archive | Sony PSP Theme | .ptf | [ptf_extract](https://github.com/GeofrontTeam/LibPSPThemes) | [1 sample file](https://sembiance.com/fileFormatSamples/archive/sonyPSPTheme/)
 archive | SouthPeak Puzzle Archive | .mco | [na_game_tool_extract](https://nihav.org/game_tool.html) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/southPeakPuzzleArchive/)
 archive | Space Rangers 2 Game Archive | .pkg | [gameextractor](https://sourceforge.net/projects/gameextractor/files/) | [2 sample files](https://sembiance.com/fileFormatSamples/archive/spaceRangers2GameArchive/)
-archive | Spacemaker | .exe .com | [deark](https://entropymine.com/deark/) | [3 sample files](https://sembiance.com/fileFormatSamples/archive/spacemaker/)
-archive | SpaceMaker Packed | .exe .com | cup386 | [10 sample files](https://sembiance.com/fileFormatSamples/archive/spaceMakerPacked/)
+archive | [Spacemaker](http://fileformats.archiveteam.org/wiki/Realia_Spacemaker) | .exe .com | [deark](https://entropymine.com/deark/) | [19 sample files](https://sembiance.com/fileFormatSamples/archive/spacemaker/)
 archive | SpinBaker SBX Archive | .sb | [spinBakerSBX](http://web.archive.org/web/20001218041900/www.spinnerbaker.com/sbx.htm) | [1 sample file](https://sembiance.com/fileFormatSamples/archive/spinBakerSBX/)
 archive | [SQLLite3 Database](http://fileformats.archiveteam.org/wiki/SQLite) | .sqlite .sqlite3 .db | [unSqlite3](https://github.com/Sembiance/dexvert) | [10 sample files](https://sembiance.com/fileFormatSamples/archive/sqlLite3/)
 archive | [SQUASH Archive](http://fileformats.archiveteam.org/wiki/Squash_(RISC_OS)) |  | [deark](https://entropymine.com/deark/) | [10 sample files](https://sembiance.com/fileFormatSamples/archive/squash/) - Alternative de-archiver I didn't try: https://github.com/mjwoodcock/riscosarc/
@@ -706,7 +705,7 @@ archive | ZX Spectrum Tape Image | .tap | [hcdisk](https://github.com/0sAND1s/HC
 
 
 
-## Audio (185)
+## Audio (187)
 Family | Name | Extensions | Converters | Notes
 ------ | ---- | ---------- | ---------- | -----
 audio | 208 Audio (Ocean Games) | .bnk | [ffmpeg](https://ffmpeg.org/) | [3 sample files](https://sembiance.com/fileFormatSamples/audio/twoZeroEightAudio/)
@@ -734,6 +733,7 @@ audio | Aureal Aspen sound bank | .arl | [vibe2wav](https://github.com/Sembiance
 audio | [AVI Audio](http://fileformats.archiveteam.org/wiki/AVI) | .avi | [ffmpeg](https://ffmpeg.org/) [awaveStudio](https://archive.org/details/AwaveStudio8.8.zip) | [12 sample files](https://sembiance.com/fileFormatSamples/audio/aviAudio/)
 audio | [Beam Software SIFF Sound](http://fileformats.archiveteam.org/wiki/SIFF) | .son | [na_game_tool](https://nihav.org/game_tool.html) [ffmpeg](https://ffmpeg.org/) | [14 sample files](https://sembiance.com/fileFormatSamples/audio/siff/) - The .son test files are technically supported by libavformat and ffmpeg/cvlc, yet it often produces very distored WAVs. My hunch is the decompression algo doesn't quite work with my particular test SIFF files. I couldn't locate ANY OTHER converters.
 audio | [Bink Audio](https://wiki.multimedia.cx/index.php/Bink_Audio) | .binka | [ffmpeg](https://ffmpeg.org/) | [1 sample file](https://sembiance.com/fileFormatSamples/audio/binkAudio/)
+audio | BIS WSS PCM Audio | .wss | [ffmpeg](https://ffmpeg.org/) | [1 sample file](https://sembiance.com/fileFormatSamples/audio/bisWSSPCMAudio/)
 audio | [Blaster Master VOC Compiled Audio](http://fileformats.archiveteam.org/wiki/VCOMP_(Blaster_Master)) | .exe | [dd](https://www.gnu.org/software/coreutils/) | [8 sample files](https://sembiance.com/fileFormatSamples/audio/vcomp/)
 audio | [BRSTM Wii Audio](http://fileformats.archiveteam.org/wiki/Nintendo_GameCube_/_Wii_BRSTM) | .brstm | [zxtune123](https://zxtune.bitbucket.io/) [vgmstream](https://github.com/vgmstream/vgmstream) | [3 sample files](https://sembiance.com/fileFormatSamples/audio/brstm/)
 audio | Capcom ASTL Audio | .astl | [ffmpeg](https://ffmpeg.org/) | [1 sample file](https://sembiance.com/fileFormatSamples/audio/capcomASTL/)
@@ -800,7 +800,7 @@ audio | MaxonMAGIC Sound Sample | .hsn | [vibe2wav](https://github.com/Sembiance
 audio | MED Synth Sound |  | [vibe2wav](https://github.com/Sembiance/dexvert) | [4 sample files](https://sembiance.com/fileFormatSamples/audio/medSynthSound/)
 audio | Microsoft XWMA Audio | .xwma .xwm | [ffmpeg](https://ffmpeg.org/) | [9 sample files](https://sembiance.com/fileFormatSamples/audio/xwmaAudio/)
 audio | MIDI Sample Dump | .sds | [sox](http://sox.sourceforge.net) [awaveStudio](https://archive.org/details/AwaveStudio8.8.zip) | [10 sample files](https://sembiance.com/fileFormatSamples/audio/midiSampleDump/)
-audio | Mohawk WAVE File | .sndl .seq .pal .shpl .cnt .bmp ._scr .scrb .mfo .puzz .shap .shp# .unit .fscn .cur .snd .mid view | [vibe2wav](https://github.com/Sembiance/dexvert) | [15 sample files](https://sembiance.com/fileFormatSamples/audio/mohawkWAVE/)
+audio | Mohawk WAVE File | .sndl .seq .pal .shpl .cnt .bmp ._scr .scrb .mfo .puzz .shap .shp# .unit .fscn .cur .snd .mid view | [vibe2wav](https://github.com/Sembiance/dexvert) [ffmpeg](https://ffmpeg.org/) | [15 sample files](https://sembiance.com/fileFormatSamples/audio/mohawkWAVE/)
 audio | [Monkey's Audio](http://fileformats.archiveteam.org/wiki/Monkey's_Audio) | .ape | [ffmpeg](https://ffmpeg.org/) [nihav](https://git.nihav.org/) [zxtune123](https://zxtune.bitbucket.io/) | [8 sample files](https://sembiance.com/fileFormatSamples/audio/monkeysAudio/)
 audio | [MPEG ADTS Layer II](http://fileformats.archiveteam.org/wiki/MPEG_Audio_Layer_II) | .mp2 | [ffmpeg](https://ffmpeg.org/) | [13 sample files](https://sembiance.com/fileFormatSamples/audio/mp2/)
 audio | [MPG Layer 3 Audio File](http://fileformats.archiveteam.org/wiki/MP3) | .mp3 .mpga .mpg |  | [10 sample files](https://sembiance.com/fileFormatSamples/audio/mp3/)
@@ -818,6 +818,7 @@ audio | [Ogg Vorbis Audio](http://fileformats.archiveteam.org/wiki/Ogg) | .ogg .
 audio | [OptimFROG](http://fileformats.archiveteam.org/wiki/OptimFROG) | .ofr .ofs | [optimFROG](http://losslessaudio.org/) | [4 sample files](https://sembiance.com/fileFormatSamples/audio/optimFROG/)
 audio | [Opus Audio](http://fileformats.archiveteam.org/wiki/Opus) | .opus | [sox](http://sox.sourceforge.net) [ffmpeg](https://ffmpeg.org/) | [7 sample files](https://sembiance.com/fileFormatSamples/audio/opus/)
 audio | [PhotoCD Audio](http://fileformats.archiveteam.org/wiki/Photo_CD_Audio) | .pcd | [sox](http://sox.sourceforge.net) | [10 sample files](https://sembiance.com/fileFormatSamples/audio/photoCDAudio/) - Some files are CDDA (audio06.pcd) but others are some sort of raw, which default to above (audio54.pcd)
+audio | Pivotal PSF Bank Audio | .wss | [ffmpeg](https://ffmpeg.org/) | [2 sample files](https://sembiance.com/fileFormatSamples/audio/pivotalPSFBank/)
 audio | [Playstation 2 Sound Format](http://fileformats.archiveteam.org/wiki/PSF2) | .psf2 | [zxtune123](https://zxtune.bitbucket.io/) | [10 sample files](https://sembiance.com/fileFormatSamples/audio/psf2/)
 audio | PlayStation Artoon WMW Audio | .wmw | [ffmpeg](https://ffmpeg.org/) | [1 sample file](https://sembiance.com/fileFormatSamples/audio/playStationArtoonWMW/)
 audio | Playstation STR Audio | .str | [ffmpeg](https://ffmpeg.org/) | [3 sample files](https://sembiance.com/fileFormatSamples/audio/playstationSTRAudio/)
@@ -1684,7 +1685,7 @@ image | [Microsoft Paint](http://fileformats.archiveteam.org/wiki/MSP_(Microsoft
 image | [Microsoft Windows Animated Cursor](http://fileformats.archiveteam.org/wiki/Windows_Animated_Cursor) | .ani | [deark](https://entropymine.com/deark/) [nconvert](https://www.xnview.com/en/nconvert/) | [27 sample files](https://sembiance.com/fileFormatSamples/image/ani/)
 image | [Microsoft Windows Cursor](http://fileformats.archiveteam.org/wiki/CUR) | .cur | [deark](https://entropymine.com/deark/) [iio2png](http://github.com/Sembiance/iio2png/) [gimp](https://gimp.org) [convert](https://www.imagemagick.org/) [nconvert](https://www.xnview.com/en/nconvert/) [wuimg](https://codeberg.org/kaleido/wuimg) [imconv](ftp://ftp.sdsc.edu/pub/sdsc/graphics/imtools) | [14 sample files](https://sembiance.com/fileFormatSamples/image/cur/)
 image | [Microsoft Windows Cursor](http://fileformats.archiveteam.org/wiki/Xcursor) |  | [xcur2png](https://github.com/eworm-de/xcur2png) [gimp](https://gimp.org) [wuimg](https://codeberg.org/kaleido/wuimg) | [10 sample files](https://sembiance.com/fileFormatSamples/image/xCursor/)
-image | [Microsoft Windows Enhanced Metafile](http://fileformats.archiveteam.org/wiki/Enhanced_Metafile) | .emf | [vibe2svg](https://github.com/Sembiance/dexvert) [deark](https://entropymine.com/deark/) [convert](https://www.imagemagick.org/) [abydosconvert](http://snisurset.net/code/abydos/) | [64 sample files](https://sembiance.com/fileFormatSamples/image/emf/)
+image | [Microsoft Windows Enhanced Metafile](http://fileformats.archiveteam.org/wiki/Enhanced_Metafile) | .emf | [vibe2svg](https://github.com/Sembiance/dexvert) [deark](https://entropymine.com/deark/) [convert](https://www.imagemagick.org/) [abydosconvert](http://snisurset.net/code/abydos/) | [66 sample files](https://sembiance.com/fileFormatSamples/image/emf/)
 image | [Microsoft Windows Icon File](http://fileformats.archiveteam.org/wiki/ICO) | .ico | [deark](https://entropymine.com/deark/) [iio2png](http://github.com/Sembiance/iio2png/) [iconvert](https://github.com/AcademySoftwareFoundation/OpenImageIO) [nconvert](https://www.xnview.com/en/nconvert/) [gimp](https://gimp.org) [imconv](ftp://ftp.sdsc.edu/pub/sdsc/graphics/imtools) [wuimg](https://codeberg.org/kaleido/wuimg) [tkimgConvert](http://tkimg.sourceforge.net/) | [14 sample files](https://sembiance.com/fileFormatSamples/image/ico/)
 image | [Microsoft Windows Metafile](http://fileformats.archiveteam.org/wiki/Windows_Metafile) | .wmf .apm .wmz | [wmf2svg](https://github.com/hidekatsu-izuno/wmf2svg) [uniconvertor](https://sk1project.net/uc2/) [soffice](https://www.libreoffice.org) [convert](https://www.imagemagick.org/) [iio2png](http://github.com/Sembiance/iio2png/) [photoDraw](https://archive.org/details/PhotoDraw2000V2) [keyViewPro](https://archive.org/details/KeyViewPro/) [corelDRAW](https://winworldpc.com/product/corel-draw/50) [hiJaakExpress](https://archive.org/details/hijaak-express) [picturePublisher](https://winworldpc.com/product/micrografx-graphics-suite/2) [canvas](http://fileformats.archiveteam.org/wiki/Canvas) | [19 sample files](https://sembiance.com/fileFormatSamples/image/wmf/) - Some WMF files like 001.WMF just have an embedded PNG. So the initial programs that convert to SVG will fail, and fall back to convert which will produce a PNG.
 image | [MIG](http://fileformats.archiveteam.org/wiki/MIG) | .mig | [recoil2png](http://recoil.sourceforge.net) | [14 sample files](https://sembiance.com/fileFormatSamples/image/mig/)

@@ -1,4 +1,4 @@
-# Unsupported File Formats (3,949)
+# Unsupported File Formats (3,948)
 These formats can still be **detected** by dexvert, they just are not converted into modern ones.<br>
 Some are not converted because they are not very useful, or are specific to a single application.<br>
 Others are not converted because it was deemed low priority, or there are no known programs to do so.
@@ -274,7 +274,7 @@ Family/Format | Name | Extensions | Notes
 
 
 
-## Audio (60)
+## Audio (59)
 Family/Format | Name | Extensions | Notes
 ------------- | ---- | ---------- | -----
 [audio/abletonSoundData](https://discmaster.textfiles.com/search?format=abletonSoundData) | Ableton Sound Data | .asd | 
@@ -286,7 +286,6 @@ Family/Format | Name | Extensions | Notes
 [audio/artOfNoiseInstrument](https://discmaster.textfiles.com/search?format=artOfNoiseInstrument) | Art of Noise Instrument | .fm | [5 sample files](https://sembiance.com/fileFormatSamples/audio/artOfNoiseInstrument/)
 [audio/audioSimAnalogueSoundfile](https://discmaster.textfiles.com/search?format=audioSimAnalogueSoundfile) | AudioSim analogue Soundfile | .snd | 
 [audio/audioWorksSoundSample](https://discmaster.textfiles.com/search?format=audioWorksSoundSample) | AudioWorks Sound Sample |  | 
-[audio/bisWSSPCMAudio](https://discmaster.textfiles.com/search?format=bisWSSPCMAudio) | BIS WSS PCM audio | .wss | 
 [audio/commonInstrumentFile](https://discmaster.textfiles.com/search?format=commonInstrumentFile) | [Common Instrument Sample](http://fileformats.archiveteam.org/wiki/Common_Instrument_Format) | .ci1 .ci2 | 
 [audio/commonLoudspeaker](https://discmaster.textfiles.com/search?format=commonLoudspeaker) | [Common Loudspeaker](http://fileformats.archiveteam.org/wiki/Common_Loudspeaker_Format) | .cf1 .cf2 | 
 [audio/covoxSpeechThingAudioSample](https://discmaster.textfiles.com/search?format=covoxSpeechThingAudioSample) | Covox Speech Thing audio sample | .v8 | 

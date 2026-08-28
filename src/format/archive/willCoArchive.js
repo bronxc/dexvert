@@ -6,5 +6,6 @@ export class willCoArchive extends Format
 	ext            = [".arc"];
 	forbidExtMatch = true;
 	magic          = ["archive:Will.ArcOpener"];
+	weakMagic      = true;
 	converters     = ["GARbro[types:archive:Will.ArcOpener]"];
 }

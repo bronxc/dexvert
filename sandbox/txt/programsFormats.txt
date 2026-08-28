@@ -1,4 +1,4 @@
-Generated on: 2026-08-09
+Generated on: 2026-08-28
 
 /-------\
 | Linux |
@@ -6387,7 +6387,7 @@ tls-zone66           Zone 66 tileset
 tls-zone66-map       Zone 66 Map Tileset
 
 
->>> GARbro ::: app-arch/GARbroserver-1.0.7 ::: https://github.com/shiikwi/GARbro
+>>> GARbro ::: app-arch/GARbroserver-1.0.8 ::: https://github.com/shiikwi/GARbro
 ID                                     Tag                                      Type     R/W   Description                                                          Signature   Extensions
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -7777,7 +7777,7 @@ zfile : zfile
 | OPLLDriver  | `.OPX`         | OPLLDriver version 1 format is not supported. |
 
 
->>> librempeg ::: media-video/librempeg-7.0_p20260805
+>>> librempeg ::: media-video/librempeg-7.0_p20260827
 Formats:
  D.. = Demuxing supported
  .E. = Muxing supported
@@ -7902,6 +7902,7 @@ Formats:
  D   cfdf_d5         CFDF D5 (Cyberflix DreamFactory v5)
  D   cfn             tri-Crescendo CAF
  D   cine            Phantom Cine
+ D   cmpwave         CompressWave CWAV
  DE  codec2          codec2 .c2 muxer
  DE  codec2raw       raw codec2 muxer
  D   concat          Virtual concatenation script
@@ -8075,6 +8076,7 @@ Formats:
  D   loas            LOAS AudioSyncStream
  D   lopu            Switch LOPU
  D   lopus           Switch OPUS
+ D   lps             Konami LPS
  DE  lrc             LRC lyrics
  D   luodat          Video CCTV DAT
  D   lvf             LVF
@@ -8202,6 +8204,8 @@ Formats:
  D   ppm_pipe        piped ppm sequence
  D   psb             PSB M2
  D   psd_pipe        piped psd sequence
+ D   psf             Pivotal PSF
+ D   psfb            Pivotal PSF Bank
  D   psnd            Polarbit PSND
   E  psp             PSP MP4 (MPEG-4 Part 14)
  DE  psxstr          Sony Playstation STR
@@ -8214,6 +8218,7 @@ Formats:
  D   qoi_pipe        piped qoi sequence
  D   qon             QON
  D   r3d             REDCODE R3D
+ D   rada            RAD Audio
  DE  rawvideo        raw video
  D   rcavoc          RCA VOC
  DE  rcwt            RCWT (Raw Captions With Time)
@@ -8311,6 +8316,7 @@ Formats:
  D   svag            Konami PS2 SVAG
   E  svcd            MPEG-2 PS (SVCD)
  D   svg_pipe        piped svg sequence
+ D   svgp            High Voltage SVGp
  D   svs             Square SVS
  D   swar            SWAR (Nintendo DS SWAR)
  D   swav            SWAV (Nintendo DS SWAV)
@@ -8401,6 +8407,7 @@ Formats:
  DE  wsaud           Westwood Studios audio
  D   wsd             Wideband Single-bit Data (WSD)
  D   wsi             Wii WSI
+ D   wss             Bohemia Interactive WSS
  D   wsvqa           Westwood Studios VQA
  DE  wtv             Windows Television (WTV)
  DE  wv              raw WavPack
@@ -8862,6 +8869,7 @@ Codecs:
  D.AIL. avc                  On2 Audio for Video Codec (decoders: on2avc)
  D.AIL. binkaudio_dct        Bink Audio (DCT)
  D.AIL. binkaudio_rdft       Bink Audio (RDFT)
+ D.AIL. bis_dpcm             DPCM Bohemia Interactive
  D.AIL. bmv_audio            Discworld II BMV audio
  D.AILS bonk                 Bonk audio
  D.AIL. cbd2_dpcm            DPCM Cuberoot-Delta-Exact
@@ -8869,6 +8877,7 @@ Codecs:
  D.AIL. cfdf_dpcm            DPCM Cyberflix DreamFactory CFDF
  ..AIL. codec2               codec2 (very low bitrate speech codec)
  DEAIL. comfortnoise         RFC 3389 Comfort Noise
+ D.AIL. compresswave         CompressWave
  D.AIL. cook                 Cook / Cooker / Gecko (RealAudio G2)
  D.AIL. cwv_dpcm             DPCM Nintendo CWV
  D.AIL. derf_dpcm            DPCM Xilam DERF
@@ -8975,6 +8984,7 @@ Codecs:
  DEAIL. qoa                  QOA (Quite OK Audio)
  DEAIL. ra_144               RealAudio 1.0 (14.4K) (decoders: real_144) (encoders: real_144)
  D.AIL. ra_288               RealAudio 2.0 (28.8K) (decoders: real_288)
+ ..AIL. rada                 RAD Audio
  D.AI.S ralf                 RealAudio Lossless
  D.AIL. rcavoc               RCA VOC
  D.AIL. relic                Relic

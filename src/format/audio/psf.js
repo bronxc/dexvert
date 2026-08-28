@@ -7,6 +7,7 @@ export class psf extends Format
 	ext            = [".psf", ".minipsf", ".dsf"];
 	forbidExtMatch = true;
 	magic          = [/^PSF1? Playstation Sound Format rip/, "Portable Sound Format", "Dreamcast Sound Format", "audio/x-psf", /^fmt\/959( |$)/];
+	forbiddenMagic = ["Pivotal PSF Bank (psfb)"];
 	metaProvider   = ["musicInfo"];
 	converters     = ["zxtune123"];
 }

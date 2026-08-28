@@ -274,7 +274,6 @@ export default
 		appleIIgsSampledInstrumentFile  : {name : "Apple IIgs Sampled Instrument File", magic : ["Apple IIgs Sampled Instrument File"]},
 		audioSimAnalogueSoundfile       : {name : "AudioSim analogue Soundfile", ext : [".snd"], magic : ["AudioSim analogue Soundfile"]},
 		audioWorksSoundSample           : {name : "AudioWorks Sound Sample", magic : ["AudioWorks sound sample"]},
-		bisWSSPCMAudio                  : {name : "BIS WSS PCM audio", ext : [".wss"], magic : ["BIS WSS PCM audio"], weakMagic : true},
 		commonInstrumentFile            : {name : "Common Instrument Sample", ext : [".ci1", ".ci2"], magic : ["Common Instrument File", /^fmt\/1887( |$)/], website : "http://fileformats.archiveteam.org/wiki/Common_Instrument_Format"},
 		commonLoudspeaker               : {name : "Common Loudspeaker", ext : [".cf1", ".cf2"], magic : ["Common Loudspeaker", /^fmt\/1944( |$)/], website : "http://fileformats.archiveteam.org/wiki/Common_Loudspeaker_Format"},
 		covoxSpeechThingAudioSample     : {name : "Covox Speech Thing audio sample", ext : [".v8"], magic : ["Covox Speech Thing audio sample"]},

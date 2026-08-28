@@ -220,6 +220,10 @@ export const WEAK_VALUES =
 	/^deark: zlib$/,
 
 	// Detect-It-Easy
+	// SEEN ONCE:
+	//		Format: Video and Media Data
+	// SEEN TWICE:
+	//		???
 	/^Archive: André Osterhues's Code Compression Algorithm \(ACCA\.\)$/,
 	/^Archive: (DCL|INSA|LZMA|Resources)$/,
 	/^Archive: Index of packed git objects/,
@@ -377,9 +381,9 @@ export const WEAK_VALUES =
 	// SEEN  ONCE:
 	// 		archive:Entis.EriOpener, archive:Cri.SpcOpener, archive:Liddell.FlkOpener, archive:Broccoli.MpegVideoOpener, archive:CandySoft.FpkOpener, archive:BlackRainbow.ImpOpener, archive:Pinky.A5rOpener
 	//      archive:Nekopunch.PakOpener, archive:NScripter.SarOpener, archive:Cri.AfsOpener, archive:Abogado.PakOpener, archive:Yatagarasu.PkgOpener, archive:UMeSoft.BinOpener
-	//		archive:Parsley.CgV1Opener, archive:WestGate.UsfOpener, archive:Silky.Ai6Opener, archive:Ikura.GanOpener, image:Tanuki.AmapFormat
+	//		archive:WestGate.UsfOpener, archive:Silky.Ai6Opener, archive:Ikura.GanOpener, image:Tanuki.AmapFormat, archive:Dogenzaka.BinOpener
 	// SEEN TWICE:
-	//		archive:Will.ArcOpener, archive:Mokopro.NNNNOpener, StudioSakura.DatOpener
+	//		archive:Parsley.CgV1Opener, archive:Will.ArcOpener, archive:Mokopro.NNNNOpener, StudioSakura.DatOpener
 	/^archive:Ail\.DatOpener /,
 	/^archive:Ankh\.GrpOpener /,
 	/^archive:BlackRainbow\.DatOpener /,

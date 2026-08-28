@@ -42,7 +42,6 @@ export const cup386 =
 		rleCOMPackerPacked          : {name : "RLE com-packer Packed", magic : ["Packer: RLE com-packer"]},
 		sixTwoFourPacked            : {name : "624 Packed", magic : ["Packer: Six-2-Fou", "Six-2-Four (624) packed DOS Command"]},
 		shrinkerPacked              : {name : "Shrinker Packed", magic : ["16bit DOS Shrinker compressed Executable"]},
-		spaceMakerPacked            : {name : "SpaceMaker Packed", magic : ["16bit DOS EXE Spacemaker compressed"]},
 		tenthPlanetSoftPackerPacked : {name : "Tenth Planet Soft Packer Packed", magic : ["Packer: Tenth Planet Soft packer[1996]"]},
 		tpackPacked                 : {name : "T-PACK Packed", magic : ["Packer: TPACK", "16bit DOS COM T-PACK compressed"]},
 		triplexPacked               : {name : "Triplex Packed", magic : ["Packer: Triplex"]},
