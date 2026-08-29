@@ -1,0 +1,886 @@
+GRASP GL Animation Library Format
+=================================
+
+Status and scope
+----------------
+
+This specification describes the GRASP GL container, the native raster, font,
+and differential-animation members carried by it, and the presentation
+language used to assemble those members into an animation. It is sufficient to
+identify member boundaries without scanning and to decode every defined field
+in the directly renderable animation profile. Later host-application profiles
+are identified explicitly in Section 10.
+
+Unless stated otherwise, every multibyte integer is unsigned, little-endian,
+and byte aligned. Coordinates use the GRASP convention: (0,0) is the lower-left
+pixel of the active graphics mode. Native planar raster streams are stored
+bottom scanline first unless their embedded standard says otherwise.
+
+
+1. GL library container
+-----------------------
+
+Offset  Size  Meaning
+0       2     Directory marker M
+2       2     Offset of the first stored member, exactly M + 2
+4       2     Reserved, exactly zero
+6       ...   N directory entries, 17 bytes each
+...     13    Reserved tail through the first-member offset
+...     ...   Consecutive stored members
+
+M is exactly 17 * (N + 1), so N = M / 17 - 1. M is at least 34 and is
+divisible by 17. The first member offset and every directory boundary must be
+inside the file.
+
+Each 17-byte directory entry is:
+
+Offset  Size  Meaning
+0       13    NUL-terminated DOS name; bytes after the first NUL are zero
+13      4     Absolute file offset immediately after this member
+
+The name is 1 through 12 ASCII bytes and is case-insensitive. Names are unique
+after case folding. The final entry's end-offset field is the special value
+zero, meaning physical end of file. For all other entries, end offsets are
+strictly increasing.
+
+The 13-byte reserved directory tail is filled with one repeated byte: 00h,
+20h, or FFh. These are allocator/slack bytes and carry no data.
+
+Each stored member begins with a 32-bit payload size. The size excludes that
+four-byte field. The payload is followed, when necessary, by 00h and/or 1Ah
+DOS/sector fill through the next directory end offset (or physical EOF for the
+last entry). No other byte value is legal in this member-extent tail. Thus the
+directory determines allocated extents and the prefix determines meaningful
+payload extents; neither boundary is inferred by scanning.
+
+The filename extension selects the payload syntax:
+
+  TXT  presentation program, CP437 text
+  BAT  DOS batch text, CP437
+  COM, EXE  opaque DOS executable used only by EXEC
+  PIC  complete Pictor raster/page image
+  CLP  Pictor clipping image
+  PCX, PCC  ZSoft PCX raster; PCC is the clipping-name convention
+  GIF  GIF raster
+  DFF  GRASP differential frame sequence
+  FLI, FLC  Autodesk Animator differential animation
+  FNT  legacy fixed-cell GRASP font
+  SET  GRASP character set (legacy or extended)
+  PAL  palette image, using the Pictor signature and layout
+  RAW  headerless unsigned 8-bit DIGPAK PCM at 11000 samples/second
+  SND  headered unsigned 8-bit GRASP PCM
+  GL   nested GRASP library used by OPENGL/LINK
+  DIR, ARC, DAT, PBB, BBB, KEY, CEL, GRP
+       revision/application-specific auxiliary members
+
+The directory does not restrict DOS extensions. Unrecognized extensions are
+valid extent-delimited opaque members. Their bytes are completely accounted for
+by the directory and length prefix, but their private grammar is defined only
+by the command or external subsystem that consumes them.
+
+PIC and CLP always select Pictor. PCX/PCC and GIF normally select their named
+standard format, but a payload beginning 34h 12h selects Pictor instead; some
+conversion tools retained the old DOS extension. PAL likewise selects Pictor
+and requires that signature. Auxiliary members have no universal payload
+grammar: their interpretation belongs to the command, linked module, or later
+application subsystem that consumes them. A presentation that attempts to use
+an unsupported auxiliary syntax is not renderable as a finite raster movie.
+
+
+2. Pictor PIC and CLP raster encoding
+-------------------------------------
+
+There are two header generations. The first word distinguishes them.
+
+2.1 Extended header (first word 1234h)
+
+Offset  Size  Meaning
+0       2     Signature 1234h
+2       2     Pixel width W
+4       2     Pixel height H
+6       2     Signed horizontal origin offset
+8       2     Signed vertical origin offset
+10      1     Plane descriptor
+11      1     Extended-header marker FFh
+12      1     ASCII GRASP video-mode code, or zero for no recommendation
+13      2     Palette descriptor type
+15      2     Palette descriptor byte count E
+17      E     Palette descriptor bytes
+17+E    2     Number of compressed blocks B; zero means raw data
+19+E    ...   Raster data or B compressed blocks
+
+The low nibble of the plane descriptor is bits per pixel per plane (PBits).
+The high nibble plus one is the plane count (Planes). Bytes per scanline per
+plane are ceil(W * PBits / 8). The exact expanded byte count is:
+
+    ceil(W * PBits / 8) * H * Planes
+
+Palette descriptor forms are listed below. Types 0 and 1 may occupy a padded
+legacy descriptor field; all otherwise-unused descriptor bytes must be zero.
+
+Type  Bytes  Meaning
+0     0      No palette carried by this image
+1     2      CGA palette/intensity selection and border color
+2     16     Sixteen IBM color numbers in the range 0..15
+3     16     Sixteen EGA 6-bit color-register values in the range 0..63
+4     768    256 RGB triples; every component is in the range 0..63
+5     48     16 RGB triples; every component is in the range 0..63
+
+Six-bit DAC components convert to eight-bit components as v*255/63. An EGA
+register r converts as follows, with each selected term added:
+
+    red   = (bit 5 ? 85 : 0) + (bit 2 ? 170 : 0)
+    green = (bit 4 ? 85 : 0) + (bit 1 ? 170 : 0)
+    blue  = (bit 3 ? 85 : 0) + (bit 0 ? 170 : 0)
+
+When B is zero, every remaining byte is raw raster data and its length must be
+the exact expanded length. Otherwise each block is:
+
+Offset  Size  Meaning
+0       2     Stored block size including this five-byte header
+2       2     Expanded block size
+4       1     Run marker
+5       ...   Marker-RLE data
+
+The sum of expanded block sizes is the exact raster byte count. Normally the
+sum of stored block sizes reaches physical member end exactly; the narrowly
+defined damaged-file exception is in Section 9.
+
+Marker RLE reads one byte at a time. A byte unequal to the marker is a literal.
+A marker is followed by an 8-bit count and a value byte. It emits count copies
+of the value. If the 8-bit count is zero, a nonzero 16-bit count occurs before
+the value. A run may not expand past the declared block or raster size.
+
+2.2 Legacy header (first word is not 1234h)
+
+Offset  Size  Meaning
+0       2     Meaningful member byte count, including this header
+2       2     Pixel width W
+4       2     Pixel height H
+6       2     Signed horizontal origin offset
+8       2     Signed vertical origin offset
+10      1     Plane descriptor, or FFh when packed
+11      1     Real plane descriptor (only when byte 10 is FFh)
+12      1     Marker-RLE marker (only when byte 10 is FFh)
+11/13   ...   Raw or marker-RLE raster bytes
+
+The meaningful byte count may be smaller than the enclosing GL member only
+when all remaining bytes are zero sector padding. The same plane formula and
+marker RLE rules apply. Legacy images carry no explicit palette.
+
+2.3 Plane-to-pixel conversion
+
+Plane zero is first, followed by all of plane one, and so on. Within a plane,
+the bottom scanline is first. Values are packed most-significant bit first.
+For pixel x, take PBits at bit position x*PBits and OR that value shifted by
+plane_number*PBits into the final palette index. Unused low-order bits at the
+end of a packed scanline do not form pixels.
+
+PUTUP and FLY place a clipping at command position
+(x+xOffset,y+yOffset). CFADE is the exception: it ignores the stored offsets
+and places the clipping at its explicit command position. PFADE normally
+ignores the stored origin because a page represents video memory beginning at
+the active page or window origin. After an explicit POSITION, instant PFADE 0
+instead treats x,y as the source pixel that maps to the active window's
+lower-left corner; this provides a viewport into a page larger than the screen.
+In planar modes, CFADE rounds x to the nearest
+video-byte boundary, with a halfway value rounding upward, and processes the
+complete last packed byte. Therefore a decoder must retain the palette indices
+represented by unused right-edge bits even though they are outside the declared
+visible width; discarding and inventing these padding pixels can produce
+vertical artifacts during clipping fades.
+
+2.4 Text-memory pages
+
+An extended Pictor member whose recommended video-mode byte is ASCII 0, 1,
+or 2 stores a captured text page rather than square pixels. Its plane layout
+is one 8-bit plane. W is the byte width and must be even; the column count is
+W/2 and H is the row count. Each row contains consecutive two-byte cells:
+
+  byte 0  CP437 character code
+  byte 1  IBM text attribute
+
+Attribute bits 0..3 select the foreground index, bits 4..6 select the
+background index, and bit 7 is the hardware blink flag. Each cell expands
+through the resident BIOS character generator to an 8-by-16 opaque raster
+cell. Thus an 80-by-25 capture has stored geometry 160-by-25 and raster
+geometry 640-by-400. The Pictor bottom-first row rule still applies to the
+stored cell rows.
+
+
+3. DFF differential frame format
+--------------------------------
+
+Offset  Size       Meaning
+0       2          Frame count F
+2       1          Bits per pixel per plane
+3       1          Additional planes; actual plane count is value + 1
+4       16 * F     Frame directory
+4+16F   ...        Concatenated frame command streams
+
+Each 16-byte frame record is:
+
+Offset  Size  Meaning
+0       4     Stream offset relative to the end of the frame directory
+4       4     Stream byte count
+8       2     Frame width W
+10      2     Frame height H
+12      2     Signed horizontal origin offset
+14      2     Signed vertical origin offset
+
+Streams are contiguous: the first relative offset is zero, every later offset
+is the sum of preceding stream sizes, and the final stream ends at member end.
+
+A nonempty frame describes exactly ceil(W*Bits/8)*H*Planes virtual bytes. A
+command may cross a packed scanline; the stream addresses one continuous
+planar video-memory rectangle. The virtual byte cursor starts at zero. The
+opcodes are:
+
+Opcode       Meaning
+80h..FFh     Literal. Count = opcode AND 7Fh; copy count following bytes.
+40h..7Fh     Fill. Count = opcode AND 3Fh; one following byte is repeated.
+00h..3Fh     Skip. Count = opcode AND 3Fh; retain prior bytes at the cursor.
+
+When the masked count is zero, a nonzero 16-bit count immediately follows the
+opcode. The fill value or literal bytes follow that extended count. The command
+stream itself has no terminator; its directory size is authoritative. Its
+virtual cursor must end at the exact expanded frame size.
+
+A zero-width, zero-height frame is an intentional timing/hold record. Its
+stream, if nonempty, consists only of syntactically valid skip commands and has
+no required final cursor value. Literal or fill data in such a record is
+invalid.
+
+Each frame operates on the packed video-memory bytes already present in that
+frame's destination rectangle. Literal and fill commands replace those bytes;
+skip commands preserve them in place. Frame rectangles may have different
+sizes and offsets, so retaining a private, animation-sized bitmap is not
+equivalent: the destination rectangle must be read from the active screen,
+updated, and written back. Convert between packed planes and palette indices
+using the Pictor plane rules. DFF has no palette; it uses the active screen
+palette.
+
+3.1 Autodesk Animator FLI/FLC members
+
+FLI and FLC members are complete Autodesk Animator byte streams. Their
+128-byte file header is:
+
+Offset  Size  Meaning
+0       4     Entire FLI/FLC payload size
+4       2     AF11h for FLI, AF12h for FLC
+6       2     Displayed frame count F
+8       2     Pixel width
+10      2     Pixel height
+12      2     Pixel depth; the GRASP profile requires 8
+14      2     Format flags
+16      4     FLC frame delay in milliseconds; for FLI, bytes 16..17 are
+              70-Hz clock ticks and bytes 18..19 are reserved
+20      2     Reserved
+22      4     Creation time
+26      4     Creator identifier
+30      4     Update time
+34      4     Updater identifier
+38      2     Horizontal pixel-aspect numerator
+40      2     Vertical pixel-aspect numerator
+42      38    Reserved/implementation metadata
+80      4     Offset of first display frame, or zero
+84      4     Offset of second display frame, or zero
+88      40    Reserved/implementation metadata
+
+The payload size is exact. Beginning at offset 128, a top-level record starts
+with a 32-bit size and 16-bit type. Type F100h is a prefix metadata chunk: its
+six-byte header and declared opaque creator data are skipped and do not produce
+a displayed frame. Type F1FAh is a display frame and has ten additional header
+bytes: 16-bit chunk count, 16-bit per-frame delay, 16-bit reserved field, and
+four reserved bytes. Exactly F display records are emitted; a subsequent ring
+frame may restore the initial image for looping, but is not included in F.
+
+Every display-frame chunk begins with a 32-bit size including its six-byte
+header and a 16-bit type. Chunks and records are contiguous and their declared
+sizes must fill their parent exactly. The GRASP Animator profile uses:
+
+  4   COLOR256: palette packets with eight-bit RGB components
+  7   SS2: word-oriented delta pixels
+  11  COLOR64: palette packets with six-bit RGB components
+  13  BLACK: clear all indices to zero; body is empty
+  15  BRUN: byte run-length encoding of the complete frame
+  16  COPY: exactly width*height literal indices
+  18  PSTAMP: embedded postage-stamp metadata; it does not alter playback
+
+A palette chunk begins with a 16-bit packet count. Each packet has an 8-bit
+number of palette entries to skip and an 8-bit count; zero count means 256.
+It then carries count RGB triples. Packet skips accumulate from palette index
+zero. COLOR64 components are 0..63 and convert as v*255/63.
+
+BRUN stores top-to-bottom scanlines. A line starts with an 8-bit advisory
+packet count; it can wrap when a line contains more than 255 packets and is not
+the line terminator. Each packet has a signed 8-bit count: a negative count
+copies that many literal bytes, while a positive count repeats the following
+byte. Packets are read until they fill the scanline width exactly.
+
+SS2 starts with a 16-bit changed-line count. A word whose top bits are 11 skips
+the encoded number of rows; a word whose top bits are 01 writes its low byte
+to the final pixel of the current row. The first word without those control
+bits is the packet count. Each packet skips an unsigned byte count of pixels,
+then uses a signed byte count: nonnegative copies count literal word pairs;
+negative repeats the following word pair abs(count) times. Rows are
+top-to-bottom. Chunk encoders may append one byte solely for word alignment;
+no larger remainder is legal.
+
+PSTAMP starts with 16-bit miniature height and width followed by translation
+code 1. The remainder is exactly one nested type-15 chunk, including its
+six-byte chunk header, whose BRUN data fills that miniature geometry. It is a
+file-browser preview and is validated but never composited into movie frames.
+
+When PUTDFF supplies a positive delay it overrides the file timing. Otherwise
+FLC uses the millisecond value at offset 16 and FLI converts its 70-Hz tick
+value to milliseconds. Palette state and the pixel-index framebuffer carry
+from one frame to the next.
+
+
+4. Fonts
+--------
+
+Glyph rows are top-to-bottom. Bits in each row are most-significant-bit first.
+
+4.1 Legacy FNT/simple SET
+
+Offset  Size  Meaning
+0       2     Entire payload size
+2       1     Character count; zero means 256
+3       1     First CP437 character code
+4       1     Cell width in pixels
+5       1     Cell height in pixels
+6       1     Bytes per glyph
+7       ...   Consecutive glyph bitmaps
+
+Row bytes are ceil(width/8). Bytes per glyph must equal rowBytes*height, and
+the declared file size must equal 7+count*bytesPerGlyph.
+
+These early fonts do not carry an explicit proportional-width table. At load
+time, scan every glyph column for set pixels. The leftmost occupied column is
+the glyph bearing and the inclusive distance to the rightmost occupied column
+is its advance width before the character gap. A blank glyph advances half of
+the declared cell width. This is the legacy GRASP `calcwidth` behavior; using
+the full declared cell for every character makes displayed strings too wide.
+
+4.2 Extended SET
+
+Offset  Size  Meaning
+0       1     10h uncompressed, 14h compressed
+1       13    Font name
+14      1     Check byte: BAh for type 10h, DCh for type 14h
+15      1     Ascent
+16      1     Character count C
+17      1     First-character delta; first CP437 code is value + 20h
+18      1     Proportional flag
+19      1     Maximum cell width
+20      1     Cell height
+21      1     Bytes per glyph scanline
+22      1     Default space width
+23      1     Inter-character gap
+24      1     Inter-line gap
+25      2     Entire payload size
+27      1     Italic flag
+28      13    Invert, horizontal-bold, vertical-bold, horizontal magnify,
+              vertical magnify, horizontal fraction, vertical fraction,
+              direction, rotate-90, horizontal flip, vertical flip, color,
+              and subtype flags
+41      18    Reserved/style extension bytes
+59      190   95 little-endian cell-offset slots
+249     95    95 cell-width slots, present only when proportional is nonzero
+...     ...    Glyph bitmap data
+
+The tables reserve entries for the full printable DOS range even if C is
+smaller. For uncompressed type 10h data, entry zero represents the
+space/default cell. Entries 1 through C point to C consecutive bitmaps of
+bytesPerScanline*height bytes. Only the first C+1 table entries are active, but
+the entire fixed table is present. Every active offset and the final whole-file
+size must agree. Type 14h identifies the GRASP compressed extended-font
+variant; its compression is separate from Pictor marker RLE.
+
+4.3 Resident and text-mode fonts
+
+Before FLOAD, graphics modes use GRASP's resident NORMAL face: 96 CP437
+characters beginning at code 20h, an 8-by-8 bitmap cell, proportional occupied
+column bearings/widths, and a one-pixel inter-character gap. This is the same
+simple-font layout described in 4.1; using the VGA 8-by-16 BIOS face changes
+both line placement and string widths.
+
+Numeric VIDEO modes 0, 1, and 2 are character-cell modes. Their default screen
+is 80 columns by 25 rows, each cell is an opaque fixed 8-by-16 BIOS glyph, and
+the secondary COLOR index fills the cell background. Explicit TEXT x,y
+coordinates are therefore column and row numbers, not pixels. Row zero is at
+the bottom, consistent with graphics coordinates.
+
+
+5. Embedded PCX/PCC dialect
+---------------------------
+
+PCX and PCC members use the same 128-byte ZSoft header; PCC is the contemporary
+DOS extension used when the image is intended as a clipping. The header has
+manufacturer 0Ah, version 2 or 5, RLE
+encoding 1. Width and height are inclusive maxima minus minima plus one. A PCX
+RLE byte with top bits 11 is a run whose count is the low six bits and whose
+value is the next byte; other bytes are literal. Decode exactly
+bytesPerLine*planes*height bytes.
+
+The supported GRASP layouts are one 8-bit plane and one through four 1-bit
+planes. Plane rows occur consecutively per scanline. One-plane 8-bit images end
+with marker 0Ch and exactly 768 bytes of 8-bit RGB palette. Planar images use
+the 16 RGB triples at header offsets 16..63 and end immediately after raster
+data. PCX scanlines are top-to-bottom and padding bytes beyond pixel width are
+not displayed.
+
+Header words 12..15 are the horizontal and vertical display dimensions used
+when the image was authored. When both are at least the stored image dimensions
+and exactly match the active page, a page fade centers a smaller stored raster
+inside that page. These words do not scale its pixels; they distinguish a
+native-size centered picture from a clipping placed at coordinate zero.
+
+
+6. Embedded GIF dialect
+-----------------------
+
+GIF members are self-contained GIF87a or GIF89a streams. GRASP treats them as
+single still images. The logical screen, global/local color tables, extension
+sub-blocks, image descriptor, LSB-first GIF LZW codes, four-pass interlace, and
+3Bh trailer have their normal GIF meanings. Exactly one image is accepted.
+The decoded index count normally equals image width times image height. A known
+early still-image encoder used with GRASP writes the GIF end code with exactly
+one pixel outstanding; GRASP's logical-screen composition leaves that final
+cell at the header's background-color index. No larger underflow is valid. The
+image is placed into the logical screen at the descriptor's left/top offset.
+Every byte through the trailer is consumed. Zero bytes after the trailer are
+permitted solely as GL sector padding; any nonzero trailing byte is invalid.
+
+6.1 Digital PCM members
+
+RAW members in the older DIGPAK profile are headerless unsigned 8-bit mono PCM
+at 11000 samples per second. SND members carry the same sample representation
+after this 16-byte header:
+
+Offset  Size  Meaning
+0       4     PCM payload byte count, excluding this header
+4       4     Sample rate in samples per second
+8       1     Maximum unsigned sample code, FFh
+9       7     Reserved, all zero
+
+The declared count must equal every remaining member byte. Sample code 80h is
+silence; codes below and above it are negative and positive amplitudes. PLAY
+holds the current video image while the mono stream is resampled to the AVI's
+44100-Hz signed 16-bit PCM track. It does not guess a rate for any other
+headerless member type.
+
+
+7. Presentation program
+-----------------------
+
+TXT payloads are CP437 source, conventionally CRLF terminated. One or more 1Ah
+DOS EOF bytes may terminate the source. A semicolon outside quotes begins a
+comment. Commands and arguments are case-insensitive except quoted text.
+Whitespace and commas are interchangeable separators. A quoted argument keeps
+spaces. A label is an alphanumeric name followed by a colon and may precede a
+command on the same line.
+
+For standalone playback, a TXT member whose stem matches the enclosing GL
+filename is the entry program. Otherwise, linked CALL/LINK edges select the
+unique unreferenced call-graph root, or the unique root reaching the greatest
+number of embedded modules. Directory order is used only when those structural
+rules remain ambiguous; this matters because linked GL directories are often
+alphabetized rather than stored in execution order.
+
+Expressions support decimal and hexadecimal integers, bare string atoms,
+variables written @name, numeric/dotted variable names, parentheses,
++ - * / %, shifts, comparisons, bitwise operators, logical || and &&, and the
+ABS, MIN, MAX, INT, ROUND, RND, LEN, ASC, and CHR functions. A defined bare
+name resolves as a variable; an undefined bare atom remains a string. SET name
+expression assigns a numeric or string variable. GLOBAL and LOCAL select
+module-wide and call-local storage. In a string/resource/label argument, `$` joins
+literal and evaluated parts: prefix$@number and prefix$(@a+@b) are typical
+forms. Parenthesized indirection `@(expression)` evaluates the result as a
+variable name. PEEKL(address) reads a 32-bit DOS-memory value and was commonly
+used as a nondeterministic seed. Tokenization retains whether an entire atom
+was quoted, so punctuation such as `!` in a literal is never reinterpreted as
+an operator. Quoted right-hand strings inside expressions, including the empty
+string and a one-space string, remain string constants rather than turning the
+whole expression into a literal. A standalone zero-padded decimal atom remains
+a string for filename construction, but numeric command arguments convert it
+to its decimal value. Within an expression, `$` concatenates strings before the
+surrounding comparison or logical operation is evaluated.
+
+Resources are addressed through numbered or symbolic registers. A load into a
+symbolic name also defines its extensionless stem as an alias. With no filename
+extension, the command supplies its normal extension: CLOAD uses CLP, PIC, then
+PCC, PLOAD uses PIC/PCX/PCC/GIF/CLP, DLOAD uses DFF then FLC/FLI, and FLOAD uses SET
+then FNT.
+Filename matching is case-insensitive.
+
+CLOAD's optional shift parameter defaults to zero, which builds shifted copies
+for single-pixel PUTUP, FLY, and FLOAT placement. A value of one retains only
+the unshifted video-byte copy to save DOS memory. With that form, PUTUP/FLY at
+an effective x coordinate (command x plus clipping xOffset) that is not a
+video-byte boundary performs no drawing. Video-byte widths are eight pixels in
+1-bit planar modes, four pixels in packed 2-bit modes, and one pixel in packed
+8-bit modes. CFADE needs no shifted copy because it rounds its explicit x to a
+video-byte boundary.
+
+The principal commands are:
+
+  VIDEO mode[,width,height]     Select graphics geometry/depth; numeric modes
+                                select 80x25 text unless dimensions are given.
+  COLOR foreground[,background] Set drawing indices.
+  CLEARSCR [index]              Fill the screen with foreground or index.
+  LINE x1,y1,x2,y2              Bresenham line in foreground.
+  RECT x1,y1,x2,y2              Filled inclusive rectangle.
+  BOX x1,y1,x2,y2[,thickness]   Inclusive rectangle outline.
+  CIRCLE x,y,rx[,ry]            Midpoint circle or ellipse outline.
+  POINT x,y                     Set one pixel.
+  POINT x1,y1,x2,y2             Set one deterministic pseudorandom pixel in
+                                the inclusive rectangle.
+  WINDOW [x1,y1,x2,y2]          Set/reset the page/drawing clip window. It does
+                                not restrict CFADE.
+  CLOAD file[,register[,shift]] Decode a clipping raster; shift=1 stores only
+                                the byte-aligned copy.
+  PLOAD file[,register]         Decode a page raster.
+  DLOAD file[,register]         Decode a DFF sequence.
+  FLOAD file[,register]         Decode and select a font.
+  CFREE/PFREE/DFREE/FFREE list  Release registers; n,-,m expands n through m.
+  PALETTE register              Install a loaded raster's palette.
+  CYCLE turns,start,count[,delay]
+                                Rotate a palette range; negative turns reverse.
+  PUTUP x,y,clip[,delay]        Draw a clipping image.
+  CFADE style,x,y,clip[,speed,delay]
+                                Reveal a clipping image with a transition.
+  PFADE style,page[,speed,delay] Reveal a page; page zero means foreground fill.
+  FADE ...                      Older spelling of PFADE.
+  PUTDFF reg[,delay,start,end,x,y]
+                                Draw an inclusive DFF/FLI/FLC frame range. An
+                                oversized endpoint such as 99 or 999 means last.
+  FLY xs,ys,xe,ye,step,delay,clips...
+                                Move/cycle clipping frames, overwriting the trail.
+  FLOAT ...                     FLY with the prior background restored per frame.
+  TILE register                 Tile an image through the active window.
+  TRAN ON indices / TRAN OFF    Enable/disable transparent palette indices.
+  TEXT x,y,string[,delay]       Draw CP437 glyphs in the current font/color.
+  TEXT string                   Continue at the current text position; WINDOW
+                                establishes its upper-left starting position.
+  FONT register                 Select a loaded font.
+  FSTYLE dir,off1[,off2]        Set a text drop-shadow direction and offsets.
+  FGAPS [char[,space[,vgap]]]   Set character, space, and vertical gaps.
+  SET LEFT/CENTER/RIGHT [ON]/OFF
+                                Select per-string text justification in WINDOW;
+                                omitted ON is the original shorthand.
+  CHGCOLOR index,EGA-register   Change an indexed EGA color.
+  SETCOLOR registers...         Replace the sixteen EGA registers.
+  SETRGB index,r,g,b[,range]    Set one or a range of VGA DAC entries.
+  SETRGB index,r,g,b,R,range    Add RGB increments across a DAC range.
+  SPREAD [source,]target[,steps]
+                                Interpolate all VGA DAC entries; the default
+                                is 64 steps, zero also means 64, and a negative
+                                value repeats each default step abs(value) times.
+  MODE border,palette           Select CGA border and palette.
+  MARK count / LOOP             Counted loop; nesting is allowed.
+  GOTO label                    Branch.
+  GOSUB label / RETURN          Subroutine call and return.
+  IF expression,label           Conditional branch.
+  IF expression ... [ELSE ...] ENDIF
+                                Conditional block with an optional alternative.
+  IFMEM bytes[,label]           Test conventional DOS memory availability.
+  IFVIDEO mode[,label]          Test availability of a video mode.
+  WAIT hundredths              Timed pause.
+  WAITKEY [hundredths[,label]]  Keyboard wait, optionally timed/branched.
+  IFKEY key,label...            Branch according to the preceding key event.
+  GETKEY variable               Read a typed key into a variable.
+  MOUSE ...                     Configure/enable/disable the mouse cursor.
+  IFMOUSE button,label,x1,y1,x2,y2,flags
+                                Branch when the selected mouse event is in a box.
+  NOISE startHz,endHz,time      PC-speaker frequency sweep, time in hundredths.
+  NOTE value,tone,time[,repeat] PC-speaker note; frequency is the 8253 clock
+                                1,193,180 Hz divided by value*tone.
+  LOAD file[,name] / FREE name  Load/release an opaque member for a subsystem.
+  DIGPAK / @SOUND ...           Configure and play RAW/SND unsigned 8-bit PCM.
+  PAN [x1,y1,]x2,y2[,R][,speed] Move a virtual-screen hardware viewport; R
+                                makes x2,y2 relative to the preceding endpoint.
+  OFFSET x,y[,R]                Set a global drawing displacement, or add to it.
+  SETPAGE display,draw          Select independent display/drawing video pages.
+  REVPAGE                       Exchange display and drawing video pages.
+  EDGE ON color / EDGE OFF      Configure transition-edge drawing.
+  OPENGL file                   Select a linked resource namespace.
+  MERGE module                  Add an embedded module's labels to local lookup.
+  CALL module[,entry,args...]   Enter an embedded TXT module or merged label.
+  LINK module[,entry,args...]   Transfer through an embedded TXT module.
+  PGETBUF reg[,x1,y1,x2,y2]     Copy the window or rectangle into a page buffer.
+  CGETBUF reg[,x1,y1,x2,y2]     Copy it into a clipping buffer.
+  PSETBUF [reg]                 Redirect drawing to a page buffer, or restore it.
+  PNEWBUF reg[,width,height]    Allocate a foreground-filled page buffer.
+  POSITION reg,x,y[,R]          Set/change a clipping origin; for a page, select
+                                the source point shown at WINDOW's lower-left by
+                                instant PFADE 0.
+  SETUPSCR width,height         Create a larger virtual screen for PAN.
+  SETUPSCR page                 Use a page's dimensions for the virtual screen.
+  RESETSCR                      Collapse the current viewport to a normal screen.
+  DATABEGIN label              Reset @ consumption to a labeled data block.
+  DATA values...                Install an inline value list for @ consumption.
+  DATASKIP displacement         Move within the active data list.
+  TIMER                         Reset the elapsed-time reference used by WAIT.
+  WHEN ...                      Install an asynchronous input handler.
+  INT num[,ax,bx,cx,dx,si,di,ds,es]
+                                Invoke a DOS/BIOS interrupt; omitted comma
+                                slots retain their register positions.
+  EXEC file                     Execute an embedded DOS COM program.
+  EXIT                          End execution.
+
+SET accepts one or more name/value pairs on the same physical command. A
+single assignment may use a tokenized expression, whose tokens are concatenated
+before evaluation; in an unambiguous even-length sequence, each alternating
+name and value is a distinct left-to-right assignment.
+
+PGETBUF and CGETBUF without coordinates capture the current WINDOW. Their
+rectangle is inclusive and uses lower-left GRASP coordinates. PGETBUF stores a
+page with a zero origin. CGETBUF stores a clipping whose x/y origin offsets are
+the captured rectangle's lower-left coordinate, so PUTUP 0,0 restores the
+capture at its original screen position. PSETBUF changes the drawing target,
+its dimensions, and its clip window until an argument-less PSETBUF writes the
+modified pixels back and restores screen drawing. SETUPSCR retains the physical
+mode's visible dimensions but makes the backing raster larger; PAN selects the
+visible rectangle within it.
+
+A data block is a label followed by whitespace/comma separated numeric records
+and DATAEND. DATABEGIN label selects it and resets its cursor. Each standalone
+`@` argument consumes the next field, left to right; counted loops commonly
+restart a block with DATABEGIN on each outer iteration. DATA blocks are source
+records and are not executed where defined.
+
+GOSUB first resolves a label in the current program and then a label exposed by
+MERGE. A bare label name used as a command is equivalent to GOSUB for
+compatibility with early source. CALL and LINK first resolve a TXT member by
+its case-insensitive filename or stem, deliberately taking precedence over a
+same-named local label. Their optional second argument selects an entry label;
+remaining arguments become numeric variables 1, 2, and so on, with variable 0
+holding the module/entry name and later its return value. Unprovided argument
+slots are empty strings (and convert to zero in numeric command positions), not
+stale values from the caller. A module has shared
+graphics/resources/global variables but private control, loop, local-variable,
+and argument stacks. EXIT in a called member resumes after CALL. LINK replaces
+the current command file and never returns; EXIT in the linked/entry member ends
+the presentation. A chain that links back to an already completed member is a
+continuous replay, so a finite movie contains exactly its first complete chain.
+OPENGL records the linked resource
+namespace; packaged libraries normally already contain those linked resources.
+
+INT initializes AX, BX, CX, DX, SI, DI, DS, and ES to zero, applies supplied
+values, and stores returned registers in their same-named variables and FLAGS in
+variable 0. The standalone profile implements the DOS 21h/3Dh existence probe
+used to find an optional adjacent library: because no external DOS namespace is
+part of one input GL, it returns FILE NOT FOUND (AX=2, carry set). Any other
+executed interrupt remains an external-host dependency and is rejected.
+
+Page switching changes which page receives drawing and which page is emitted
+to video. REVPAGE makes the completed hidden page visible in one vertical
+retrace operation and begins drawing into the old visible page. These later
+stateful language extensions do not change the GL container encoding.
+
+7.1 Text spacing and shadow directions
+
+FGAPS parameters are character gap, extra space-character gap, and vertical
+line gap, in that order; each may be negative. With no parameters the font's
+stored defaults are restored.
+
+FSTYLE zero disables shadowing. Directions 1 through 8 run counter-clockwise
+from right: right, upper-right, up, upper-left, left, lower-left, down, and
+lower-right. Odd styles are cardinal and ignore the irrelevant offset. If only
+off1 is supplied it is used for both axes. TEXT first draws the shadow in the
+background color at that offset, then the glyph in the foreground color.
+
+With LEFT justification, an explicit x,y TEXT sets the continuation cursor
+immediately after its last character and a one-argument TEXT starts there.
+With CENTER or RIGHT, each TEXT string is justified independently and leaves
+the cursor on the next baseline. WINDOW resets the cursor to its upper-left
+usable baseline; reaching the right edge wraps to the left edge one font height
+plus the vertical gap lower.
+
+7.2 Graphics modes
+
+The mode letters used by the raster runtime include:
+
+  A 320x200x4       B 320x200x16      C 640x200x2
+  D 640x200x16      E 640x350x2       F 640x350x4
+  G 640x350x16      H 720x348x2       I/J 320x200x16
+  K 640x400x2       L 320x200x256     M 640x480x16
+  N 720x348x16      O 640x480x2       R 640x400x256
+  S 640x480x256     T 800x600x256     U 1024x768x2
+  V 1024x768x16     W 360x480x256     X 1024x768x256
+  Y 1280x1024x16    Z 1280x1024x256
+
+7.3 Transition styles
+
+Style 0 is a snap. Styles 1 and 2 wipe left/right; 3 and 4 wipe outside-in and
+inside-out horizontally; 5 and 6 are horizontal interlaces; 7 and 8 are paired
+horizontal wipes; 9 and 10 wipe top/bottom; 11 and 12 wipe outside-in and
+inside-out vertically; 13 and 14 are vertical interlaces/halves; 15 uses
+opposed half-screen directions; 16 reveals quarters; 17 is a column/finger
+pattern; 18 is double interlace; 19 pours/slithers; 20 sparkles in randomized
+blocks; 21 is diagonal; 22 and 23 open/close an aperture; 24 is a clock sweep;
+25 is a double-arc/slant effect. PFADE is always limited by WINDOW. CFADE is
+explicitly unaffected by WINDOW and reveals its complete clipping rectangle,
+clipped only by the physical screen. CFADE and PFADE copy every source index
+and therefore ignore TRAN transparency state.
+
+When EDGE is enabled, styles 1..4, 9..12, 22, and 23 draw a one-pixel leading
+line in the selected palette index immediately outside (or, for a closing
+aperture, inside) the newly copied boundary. The following wipe step replaces
+the preceding edge, and the final step leaves only the completed target.
+
+The speed argument is the requested total fade time in hundredths of a second;
+the runtime divides it among the style's drawing primitives. A value below the
+hardware time needed to touch the video bytes is disregarded, as documented by
+GRASP. For deterministic AVI timing, the direct profile models that minimum as
+64 KiB of packed video memory per 20-fps frame; an EGA 640x350x16 page therefore
+requires at least two frames. Delay is a separate pause after the completed
+fade.
+
+
+8. Finite-video playback policy
+-------------------------------
+
+The original language is interactive and permits presentations that never end.
+For finite video, an indefinite WAITKEY becomes a 60-hundredth pause followed
+by synthesized input. A nominal WAIT or WAITKEY longer than ten seconds is
+also treated as an interactive hold and shortened to 60 hundredths. The
+synthesis is deterministic and based only on the command stream and current
+variables:
+
+* Help, exit, quit, and return-to-menu targets are excluded while a content
+  target exists.
+* A directional menu containing confirmation repeats a bounded visible cycle:
+  change the current choice with RIGHT (LEFT if RIGHT is absent), try ENTER,
+  then move DOWN (UP if DOWN is absent) only if the program returns to the
+  selector. Thus the script itself determines which row accepts confirmation;
+  no menu size is assumed. After 24 visits, one final ENTER is attempted and a
+  return to the same selector ends the representative route.
+* Other IFKEY menus choose the first eligible content key in source order and
+  record one complete selection. An IFKEY chain without a preceding WAITKEY
+  uses the same rule.
+* An IFMOUSE dispatch table visits eligible content hotspots in source order.
+  On each return to the selector it chooses the next region, allowing a
+  mouse-only menu to expose both its editable choices and its final action.
+* Before GETKEY, the converter scans the immediately following decision block
+  for comparisons of that variable to evaluated numeric or string expressions.
+  Carriage-return/ENTER is preferred over escape and extended navigation codes;
+  otherwise the first non-help printable expected value is entered. If no
+  checkable answer is exposed, ENTER is supplied.
+
+This policy produces one representative, reproducible route; it does not claim
+that the route is the only valid interactive session. Input is injected into
+the native command interpreter and is never obtained by running or capturing
+an original executable.
+
+The movie canvas is 640 by 480. Standard 80-by-25 text pages occupy 640 by 400
+and are vertically centered. Extended text adapters whose character
+framebuffer is larger than the canvas retain the complete page through a
+centered, aspect-preserving nearest-neighbor fit; no screen region is cropped.
+
+An unconditional backward GOTO at the end of a complete presentation denotes
+continuous playback. A finite recording contains one traversal. A counted
+outer loop that encloses the complete source is likewise recorded once. All
+interior MARK/LOOP animation cycles and conditional branches retain their
+defined behavior.
+
+A non-returning LINK chain is likewise finite after every distinct embedded
+member in that chain has executed once. A LINK back to an already visited
+member marks the authored replay boundary; it is not executed a second time.
+
+A backward GOTO containing only palette CYCLE activity is recorded until its
+variable-controlled exit. If its state is stable, five representative seconds
+are recorded; a damaged nonterminating color loop has a ten-second ceiling.
+Palette changes are emitted as video frames even when the pixel-index bitmap
+itself never changes.
+
+A noninteractive video conversion may intentionally mute a template success
+chime while retaining its timing. Such a chime is represented as three or more
+adjacent NOTE commands with an evenly descending first divisor and identical
+second divisor/duration. Other NOTE and NOISE commands remain animation audio.
+
+
+9. Validation and damaged-library recovery
+------------------------------------------
+
+A conforming writer produces the exact directory, prefix, padding, compressed
+sizes, expanded raster sizes, DFF virtual extents, font offsets, and image
+trailers specified above. Unknown member types, unknown commands on the
+executed route, unresolved resources or called modules, malformed standard
+images, and unrecognized host EXEC programs cannot be rendered beyond their
+failure point. A recognized application-specific auxiliary member may be
+accepted as an extent-delimited opaque object only when no executed command
+consumes it; this accounts for its container bytes but does not define its
+private payload.
+
+The converter has a bounded recovery mode for damaged archives. It never scans
+for guessed member signatures, filenames, dimensions, palettes, or command
+boundaries. The validated directory remains authoritative, and recovery is
+limited to these deterministic cases:
+
+* If physical EOF truncates a member, its available directory-delimited bytes
+  are retained and all later members are marked absent. If a length prefix is
+  larger than the available extent, the available bytes after the prefix are
+  the damaged payload. Non-00h/1Ah bytes after a shorter declared payload are
+  recorded as malformed extent tail. A decoder that cannot prove the retained
+  payload's structure quarantines that member; unrelated members remain usable.
+* Presentation syntax and branch targets are validated when execution reaches
+  them. Consequently, a typo in a dead branch for an unavailable adapter does
+  not invalidate the selected adapter path.
+* In an executed integer argument only, a lone ASCII letter O may recover as
+  numeric zero. No other token spelling or expression is repaired.
+* A DFF command stream may overrun the allocated frame by no more than two
+  complete planar scan lines. The commands and all bytes are consumed, while
+  writes beyond the bitmap allocation are clipped as they are by the DOS
+  drawing buffer. A larger overrun or any underfill remains invalid.
+* An extended Pictor raster whose declared block count and every block stream
+  decode to the exact declared image may have otherwise-unreferenced bytes
+  after the final block. Those bytes are quarantined and reported; they are
+  neither scanned nor interpreted as image data.
+* PFREE/CFREE invalidate a buffer handle. If damaged source subsequently uses
+  the same handle before its simulated DOS heap storage is overwritten,
+  recovery may read the released page or clipping bytes and emits a warning.
+  No missing or never-loaded buffer is invented.
+* If a DATA table has exactly one missing final value, its last three values
+  are integers, and they form one exact arithmetic sequence, one continuation
+  value may be supplied. Every other DATA overread is fatal.
+* A late executed error ends conversion at that point. If valid visible frames
+  already exist, they are finalized as a partial AVI and a warning identifies
+  the exact stopping condition. If no visible content was reached, no output is
+  created.
+
+Container identity, directory names/order, supported extensions, and resource
+lookup remain exact. This policy recovers provable prefixes and independent
+members; it does not reinterpret arbitrary corrupt bytes as an invented image
+or program.
+
+
+10. Conversion-profile boundary
+-------------------------------
+
+The directly renderable profile consists of the GL container, TXT animation
+language, Pictor/PCX/GIF still rasters, DFF and Animator FLI/FLC animation
+streams, RAW/SND unsigned 8-bit PCM, uncompressed legacy/extended fonts,
+palettes, page buffers, VGA/CGA/EGA raster operations, and PC-speaker audio
+defined above. The following identifiers belong to later
+or host-application profiles and do not by themselves define portable finite
+video behavior:
+
+* type 14h compressed extended SET fonts;
+* raw/PBB binary fonts and BBB application manifests;
+* CEL playback, MCI/WAV/CMF control, and Windows library calls;
+* HLL commands for mouse-driven forms, files, printers, DOS interrupts other
+  than the explicitly defined optional-library probe, and dynamically merged
+  GRP modules;
+* external GL/GRP/module references not embedded in the current library.
+
+Hardware modes wider or taller than the 640-by-480 AVI canvas are supported by
+a centered, aspect-preserving nearest-neighbor fit of the complete framebuffer.
+
+A direct movie converter must reject a presentation that depends on one of
+those facilities unless it implements that facility exactly. Resource-only
+libraries, modules whose entry point begins inside a caller-owned subroutine,
+and libraries with no executable TXT entry are not standalone presentations.

@@ -75,7 +75,7 @@ const SUPPORTING_DIR_PATHS = [
 ];
 
 const SUPPORTING_FAMILY_PARENT_FILE_PATHS = [
-	"video/res0006"
+	"video/res0006"	// https://discmaster.textfiles.com/view/4349/ClassicFond39.iso/objs/topsy.rar/TOPSY.BIN/res0006
 ];
 
 const FORCE_FORMAT_AS = [

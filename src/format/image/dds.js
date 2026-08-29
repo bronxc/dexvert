@@ -6,7 +6,7 @@ export class dds extends Format
 	website      = "http://fileformats.archiveteam.org/wiki/DirectDraw_Surface";
 	ext          = [".dds"];
 	mimeType     = "image/x-direct-draw-surface";
-	magic        = ["DirectX DirectDraw Surface", "Microsoft DirectDraw Surface", "DirectDraw Surface", "image/x-dds", "piped dds sequence (dds_pipe)", "image:DirectDraw.DdsFormat", /^geViewer: DDS_DDS( |$)/, /^fmt\/1040( |$)/];
+	magic        = ["DirectX DirectDraw Surface", "Microsoft DirectDraw Surface", "DirectDraw Surface", "image/x-dds", "piped dds sequence (dds_pipe)", "image:DirectDraw.DdsFormat", "image/vnd.ms-dds", /^geViewer: DDS_DDS( |$)/, /^fmt\/1040( |$)/];
 	metaProvider = ["image"];
 	converters   = [
 		"ffmpeg[format:dds_pipe][outType:png]",
